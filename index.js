@@ -13,7 +13,9 @@ const INTERVAL_MINUTES = 5;
 // ✅ 実行関数（監視処理）
 async function runWatcher() {
   const browser = await puppeteer.launch({
-    headless: 'new', // Chrome117以降の新モード
+    headless: true,
+    executablePath: process.env.CHROME_PATH
+      || '/usr/bin/google-chrome',
     args: ['--no-sandbox', '--disable-setuid-sandbox']
   });
 
