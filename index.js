@@ -1,77 +1,82 @@
 const puppeteer = require('puppeteer');
 const axios = require('axios');
 
-// ✅ GAS通知用エンドポイント（Render側の環境変数名：GAS_WEBHOOK_URL）
+// ✅ 固定URL：セッション付きカレンダー表示画面
+const TARGET_URL = 'https://as.its-kenpo.or.jp/calendar_apply/calendar_select?s=PUFqTXpNak53RVROM0VUUHpWbWNwQkhlbDlWZW1sbWNsWm5KeDBEWnA5VmV5OTJabFJYWWo5VlpqbG1keVYyYw%3D%3D';
+
+// ✅ GAS通知先（環境変数から取得）
 const GAS_WEBHOOK_URL = process.env.GAS_WEBHOOK_URL;
 
-// ✅ 健保カレンダーのセッション付きURL（埋め込み済み）
-const TARGET_URL = "https://as.its-kenpo.or.jp/calendar_apply/calendar_select?s=PVVqTnlJak53RVROM0VUUHpWbWNwQkhlbDlWZW1sbWNsWm5KeDBEWnA5VmV5OTJabFJYWWo5VlpqbG1keVYyYw%3D%3D";
+// ✅ 繰り返し監視の間隔（分）
+const INTERVAL_MINUTES = 5;
 
-// ✅ GASのトリガーが1分間隔でも、5分おきに実行されるように内部待機で制御
-const waitFiveMinutes = () => new Promise(resolve => setTimeout(resolve, 5 * 60 * 1000));
-
-(async () => {
+// ✅ 実行関数（監視処理）
+async function runWatcher() {
   const browser = await puppeteer.launch({
-    headless: true,
-    args: ['--no-sandbox'],
-    executablePath: process.env.CHROME_PATH || undefined
+    headless: 'new', // Chrome117以降の新モード
+    args: ['--no-sandbox', '--disable-setuid-sandbox']
   });
 
   const page = await browser.newPage();
-  await page.setDefaultNavigationTimeout(60000);
 
   try {
-    await page.goto(TARGET_URL, { waitUntil: 'networkidle2' });
+    await page.goto(TARGET_URL, {
+      waitUntil: 'networkidle2',
+      timeout: 60000
+    });
 
     const html = await page.content();
 
-    // ❌ サービスカテゴリなどにリダイレクトされたらセッション切れ
-    if (html.includes("サービスカテゴリ") || html.includes("ログイン") || html.includes("エラー")) {
-      await axios.post(GAS_WEBHOOK_URL, {
-        message: "❌ セッション切れ。リンク貼り直して！"
-      });
+    // ✅ エラーページ検出（reCAPTCHAや404）
+    if (html.includes('時間切れ') || html.includes('確認は') || html.includes('404')) {
+      await sendLine(`❌ セッション切れまたはリンク無効：再ログインしてURL更新して！`);
       await browser.close();
       return;
     }
 
-    // ✅ reCAPTCHAチェックボックスだけの場合 → 自動クリック
-    const frames = await page.frames();
-    const recaptchaFrame = frames.find(f => f.url().includes("https://www.google.com/recaptcha/api2/anchor"));
-
-    if (recaptchaFrame) {
-      const checkbox = await recaptchaFrame.$('#recaptcha-anchor');
-      if (checkbox) {
-        await checkbox.click();
-        await page.waitForTimeout(3000);
-      } else {
-        await axios.post(GAS_WEBHOOK_URL, {
-          message: "⚠️ 画像認証付きreCAPTCHAで止まったよ。手動確認して！"
-        });
-        await browser.close();
-        return;
-      }
-    }
-
-    // ✅ 「○」画像がカレンダー内に存在するか確認
+    // ✅ 空き○アイコンの検出
     const hasCircle = await page.evaluate(() => {
       return [...document.images].some(img => img.src.includes("icon_circle.png"));
     });
 
     if (hasCircle) {
-      await axios.post(GAS_WEBHOOK_URL, {
-        message: `✅ 空きあり！今すぐ確認！\n\n${TARGET_URL}`
-      });
+      await sendLine(`✅ 健保の予約枠に空きあり！すぐ確認して！\n\n${TARGET_URL}`);
     } else {
-      console.log("🔁 空きなし。5分後に再試行予定。");
+      console.log('🔁 空きなし');
     }
 
-    // ✅ 5分待って次回に備える（次のトリガーまでスリープ）
-    await waitFiveMinutes();
-  } catch (e) {
-    await axios.post(GAS_WEBHOOK_URL, {
-      message: "⚠️ 処理エラー：" + e.message
-    });
+    // ✅ ダミー動作：任意の○リンクをクリックして画面遷移 → 戻る（セッション維持対策）
+    const circleSelector = 'img[src*="icon_circle.png"]';
+    const circle = await page.$(circleSelector);
+    if (circle) {
+      await circle.click();
+      await page.waitForTimeout(3000); // 画面遷移後にちょっと待つ
+      await page.goBack({ waitUntil: 'networkidle2' });
+    }
+
+  } catch (err) {
+    console.error('⚠️ エラー:', err.message);
+    await sendLine(`⚠️ Render実行エラー: ${err.message}`);
   } finally {
     await browser.close();
+  }
+}
+
+// ✅ LINE通知 → GAS経由で送信
+async function sendLine(message) {
+  try {
+    await axios.post(GAS_WEBHOOK_URL, { message });
+  } catch (err) {
+    console.error('⚠️ LINE通知エラー:', err.message);
+  }
+}
+
+// ✅ インターバル監視開始（5分間隔で自動ループ）
+(async () => {
+  while (true) {
+    console.log('🔍 監視ループ開始');
+    await runWatcher();
+    console.log(`⏳ ${INTERVAL_MINUTES}分待機...`);
+    await new Promise(resolve => setTimeout(resolve, INTERVAL_MINUTES * 60 * 1000));
   }
 })();
