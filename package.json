@@ -1,13 +1,12 @@
 {
   "name": "kenpo-watcher",
   "version": "1.0.0",
-  "license": "MIT",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
     "puppeteer": "^22.8.0",
-    "axios": "^1.6.8"
+    "axios": "^1.4.0"
   }
 }
