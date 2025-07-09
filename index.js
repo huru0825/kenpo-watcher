@@ -2,7 +2,7 @@ const puppeteer = require('puppeteer');
 const axios = require('axios');
 
 // ✅ 固定URL：セッション付きカレンダー表示画面
-const TARGET_URL = 'https://as.its-kenpo.or.jp/calendar_apply/calendar_select?s=PUFqTXpNak53RVROM0VUUHpWbWNwQkhlbDlWZW1sbWNsWm5KeDBEWnA5VmV5OTJabFJYWWo5VlpqbG1keVYyYw%3D%3D';
+const TARGET_URL = 'https://as.its-kenpo.or.jp/calendar_apply/calendar_select?s=PUlET3pVak53RVROM0VUUHpWbWNwQkhlbDlWZW1sbWNsWm5KeDBEWnA5VmV5OTJabFJYWWo5VlpqbG1keVYyYw%3D%3D';
 
 // ✅ GAS通知先（環境変数から取得）
 const GAS_WEBHOOK_URL = process.env.GAS_WEBHOOK_URL;
