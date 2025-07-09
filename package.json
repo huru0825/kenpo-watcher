@@ -2,13 +2,13 @@
   "name": "kenpo-watcher",
   "version": "1.0.0",
   "license": "MIT",
-  "description": "健保カレンダー監視Bot（Render用）",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "puppeteer": "^22.8.0",
+    "puppeteer-core": "^22.8.0",
+    "chrome-aws-lambda": "^10.1.0",
     "axios": "^1.4.0"
   }
 }
