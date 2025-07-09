@@ -1,20 +1,25 @@
-const puppeteer = require('puppeteer-core');
-const chromium = require('chrome-aws-lambda');
+const puppeteer = require('puppeteer');
 const axios = require('axios');
 
-// ✅ 監視対象のURL（セッション付きURLをここに設定）
-const TARGET_URL = 'https://as.its-kenpo.or.jp/calendar_apply/calendar_select?s=PWdETXpBek13RVROM0VUUHpWbWNwQkhlbDlWZW1sbWNsWm5KeDBEWnA5VmV5OTJabFJYWWo5VlpqbG1keVYyYw%3D%3D'; // ← セッション付きURLに更新する
+// ✅ 埋め込み型（環境変数ではなく直書き）
+const TARGET_URL = 'https://as.its-kenpo.or.jp/calendar_apply/calendar_select?s=PVV6TTFVVE53RVROM0VUUHpWbWNwQkhlbDlWZW1sbWNsWm5KeDBEWnA5VmV5OTJabFJYWWo5VlpqbG1keVYyYw%3D%3D'; // ← 最新のセッション付きURLに差し替え
+const GAS_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbxRlqe34OLKXLIeRhwwKZchDupvPTq9hA54f5mb2MKvJ0BMdBdjHGAmWoHYn3rgAhWZ/exec';
 
-// ✅ 通知先GAS Webhook（doPost URL）
-const GAS_POST_URL = 'https://script.google.com/macros/s/AKfycbxRlqe34OLKXLIeRhwwKZchDupvPTq9hA54f5mb2MKvJ0BMdBdjHGAmWoHYn3rgAhWZ/exec'; // ← GASのWeb Apps URLに置き換える
+// ✅ GASへ通知を送る関数
+async function notifyToGAS(message) {
+  try {
+    await axios.post(GAS_WEBHOOK_URL, { message });
+    console.log('✅ GASへ通知送信:', message);
+  } catch (e) {
+    console.error('⚠️ GAS通知失敗:', e.message);
+  }
+}
 
-// ✅ メイン処理
 (async () => {
   const browser = await puppeteer.launch({
-    args: chromium.args,
-    defaultViewport: chromium.defaultViewport,
-    executablePath: await chromium.executablePath,
-    headless: chromium.headless
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    executablePath: '/usr/bin/google-chrome' // ✅ Render環境でのChrome実行パス
   });
 
   const page = await browser.newPage();
@@ -22,39 +27,37 @@ const GAS_POST_URL = 'https://script.google.com/macros/s/AKfycbxRlqe34OLKXLIeRhw
   try {
     await page.goto(TARGET_URL, { waitUntil: 'networkidle2', timeout: 60000 });
 
-    const html = await page.content();
-
-    // ✅ reCAPTCHAの存在チェック
-    const hasReCAPTCHA = html.includes('recaptcha') || html.includes('g-recaptcha');
-    if (hasReCAPTCHA) {
-      console.log('⚠️ reCAPTCHA検知 → 通知 & 処理スキップ');
-      await axios.post(GAS_POST_URL, {
-        message: '⚠️ reCAPTCHAが表示されたよ！セッション切れかも。'
-      });
-      return;
+    // ✅ reCAPTCHAチェックボックス突破（画像選択はスキップ）
+    const isRecaptcha = await page.$('iframe[src*="recaptcha"]');
+    if (isRecaptcha) {
+      const frame = (await page.frames()).find(f => f.url().includes('recaptcha'));
+      const checkbox = await frame.$('.recaptcha-checkbox-border');
+      if (checkbox) {
+        await checkbox.click();
+        console.log('✅ reCAPTCHAチェックボックスクリック完了');
+        await page.waitForTimeout(3000);
+      } else {
+        console.log('⚠️ 画像選択付きreCAPTCHA → スキップ＆終了');
+        await browser.close();
+        return;
+      }
     }
 
-    // ✅ 空き判定（○アイコン or alt="○" 判定）
-    const hasCircle = await page.evaluate(() => {
-      return [...document.images].some(img =>
-        img.src.includes("icon_circle.png") || img.alt === "○"
-      );
+    const foundCircle = await page.evaluate(() => {
+      return [...document.images].some(img => img.src.includes('icon_circle.png'));
     });
 
-    if (hasCircle) {
-      console.log('✅ 空きあり → GAS通知');
-      await axios.post(GAS_POST_URL, {
-        message: `✅ 予約枠に空きが出たよ！いますぐチェック！\n\n${TARGET_URL}`
-      });
+    if (foundCircle) {
+      await notifyToGAS('✅ 健保予約カレンダーに空き（◯）があります！\n' + TARGET_URL);
     } else {
-      console.log('🔁 空きなし → 通知せずスルー');
+      console.log('🔁 ◯なし。空きなし or 満席');
     }
 
-  } catch (error) {
-    console.error('❌ 処理中エラー:', error.message);
-    await axios.post(GAS_POST_URL, {
-      message: `❌ 処理中にエラー発生: ${error.message}`
-    });
+  } catch (e) {
+    console.error('⚠️ カレンダー監視失敗:', e.message);
+    if (e.message.includes('net::ERR') || e.message.includes('timeout')) {
+      await notifyToGAS('⚠️ カレンダー取得失敗（セッション切れの可能性）\nURL更新してね → ' + TARGET_URL);
+    }
   } finally {
     await browser.close();
   }
