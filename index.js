@@ -7,7 +7,7 @@ const GAS_WEBHOOK_URL = process.env.GAS_WEBHOOK_URL;
 const TARGET_FACILITY_NAME = process.env.TARGET_FACILITY_NAME || ''; // 部分一致
 const DAY_FILTER_RAW = process.env.DAY_FILTER || '土曜日'; // '日曜日'など日本語可
 const DATE_FILTER_RAW = process.env.DATE_FILTER || ''; // '1月1日,2月3日'など複数可
-const CHROME_PATH = process.env.CHROME_PATH || '/usr/bin/google-chrome'; // ✅ デフォルトパスも指定
+// const CHROME_PATH = process.env.CHROME_PATH || '/usr/bin/google-chrome'; // ✅ デフォルトパスも指定
 
 // === 曜日マップ（日本語 → 英語） ===
 const DAY_MAP = {
