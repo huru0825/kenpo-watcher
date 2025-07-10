@@ -41,10 +41,9 @@ const DAY_FILTER = DAY_MAP[DAY_FILTER_RAW] || null;
 
 (async () => {
   const browser = await puppeteer.launch({
-    headless: true, // ✅ 安定の "true" 推奨
-    executablePath: CHROME_PATH, // ✅ RenderのChromeパスを明示
-    args: ['--no-sandbox', '--disable-setuid-sandbox'] // ✅ Render用の定番フラグ
-  });
+  headless: true,
+  args: ['--no-sandbox', '--disable-setuid-sandbox']
+});
 
   const page = await browser.newPage();
   await page.goto(TARGET_URL, { waitUntil: 'networkidle2', timeout: 60000 });
