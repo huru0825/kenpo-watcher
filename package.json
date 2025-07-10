@@ -4,10 +4,10 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "postinstall": "echo 'Skip puppeteer install for Render build'"
+    "postinstall": "puppeteer install"
   },
   "dependencies": {
-    "puppeteer": "21.3.8",
+    "puppeteer": "^21.3.8",
     "axios": "^1.4.0"
   }
 }
