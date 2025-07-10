@@ -7,7 +7,6 @@ const GAS_WEBHOOK_URL = process.env.GAS_WEBHOOK_URL;
 const TARGET_FACILITY_NAME = process.env.TARGET_FACILITY_NAME || '';
 const DAY_FILTER_RAW = process.env.DAY_FILTER || '土曜日';
 const DATE_FILTER_RAW = process.env.DATE_FILTER || '';
-const CHROMIUM_PATH = process.env.CHROMIUM_PATH || '/usr/bin/chromium-browser'; // ← これがポイント ✅
 
 // === 曜日マップ（日本語 → 英語）===
 const DAY_MAP = {
@@ -20,10 +19,10 @@ const DAY_MAP = {
   '土曜日': 'Saturday'
 };
 
-// === 日付正規化 ===
+// === 日付正規化関数 ===
 const normalizeDates = (raw) => {
   return raw
-    .replace(/、/g, ',')
+    .replace(/、/g, ',') // 全角カンマを半角に変換
     .split(',')
     .map(d => d.trim())
     .filter(Boolean)
@@ -43,14 +42,15 @@ const DAY_FILTER = DAY_MAP[DAY_FILTER_RAW] || null;
   console.log('🔄 Launching browser...');
   const browser = await puppeteer.launch({
     headless: true,
-    executablePath: CHROMIUM_PATH, // ✅ 明示的にパスを指定
-    args: ['--no-sandbox']
+    args: ['--no-sandbox', '--disable-setuid-sandbox']
+    // executablePath は未指定：Puppeteerの内蔵Chromiumを使用する
   });
   console.log('✅ Browser launched');
 
   const page = await browser.newPage();
   await page.goto(TARGET_URL, { waitUntil: 'networkidle2', timeout: 60000 });
 
+  // ○アイコンがあるリンクを抽出
   const availableDates = await page.$$eval('img', imgs =>
     imgs
       .filter(img => img.src.includes('icon_circle.png'))
@@ -86,6 +86,7 @@ const DAY_FILTER = DAY_MAP[DAY_FILTER_RAW] || null;
     }
   }
 
+  // GASに通知送信
   for (const hit of matched) {
     const message = `✅ ${DAY_FILTER_RAW}：空きあり「${TARGET_FACILITY_NAME}」\n${hit}\n\n${TARGET_URL}`;
     await axios.post(GAS_WEBHOOK_URL, { message });
