@@ -42,7 +42,6 @@ const DAY_FILTER = DAY_MAP[DAY_FILTER_RAW] || null;
 (async () => {
   const browser = await puppeteer.launch({
   headless: true,
-  executablePath: process.env.CHROMIUM_PATH || undefined, // ← ★この行を追加
   args: ['--no-sandbox']
 });
   
