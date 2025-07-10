@@ -3,8 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "postinstall": "echo '🛠 Puppeteer postinstall disabled for Render build'"
+    "start": "node index.js"
   },
   "dependencies": {
     "axios": "^1.4.0",
