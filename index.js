@@ -7,6 +7,7 @@ const GAS_WEBHOOK_URL = process.env.GAS_WEBHOOK_URL;
 const TARGET_FACILITY_NAME = process.env.TARGET_FACILITY_NAME || ''; // 部分一致
 const DAY_FILTER_RAW = process.env.DAY_FILTER || '土曜日'; // '日曜日'など日本語可
 const DATE_FILTER_RAW = process.env.DATE_FILTER || ''; // '1月1日,2月3日'など複数可
+const CHROME_PATH = process.env.CHROME_PATH || '/usr/bin/google-chrome'; // ✅ デフォルトパスも指定
 
 // === 曜日マップ（日本語 → 英語） ===
 const DAY_MAP = {
@@ -40,9 +41,11 @@ const DAY_FILTER = DAY_MAP[DAY_FILTER_RAW] || null;
 
 (async () => {
   const browser = await puppeteer.launch({
-    headless: 'new',
-    args: ['--no-sandbox']
+    headless: true, // ✅ 安定の "true" 推奨
+    executablePath: CHROME_PATH, // ✅ RenderのChromeパスを明示
+    args: ['--no-sandbox', '--disable-setuid-sandbox'] // ✅ Render用の定番フラグ
   });
+
   const page = await browser.newPage();
   await page.goto(TARGET_URL, { waitUntil: 'networkidle2', timeout: 60000 });
 
