@@ -1,13 +1,13 @@
 {
-  "name": "kenpo-watcher",
+  "name": "my-bot-project",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "postinstall": "node node_modules/puppeteer/install.js"
+    "postinstall": "echo '🛠 Puppeteer postinstall disabled for Render build'"
   },
   "dependencies": {
-    "puppeteer": "21.3.8",
-    "axios": "^1.4.0"
+    "axios": "^1.4.0",
+    "puppeteer": "21.3.8"
   }
 }
