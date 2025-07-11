@@ -3,13 +3,11 @@
   "version": "1.0.0",
   "scripts": {
     "fetch-artifact": "node scripts/fetch-artifact.js",
-    "start": "node src/index.js"
+    "start": "node index.js"
   },
   "dependencies": {
     "puppeteer": "^21.3.8",
-    "axios": "^1.4.0"
-  },
-  "devDependencies": {
+    "axios": "^1.4.0",
     "unzipper": "^0.10.11"
   }
 }
