@@ -1,18 +1,26 @@
+name: Build and Publish Binary
+
+on:
+  push:
+    branches: [ main ]
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-      - name: Install deps
+      - name: Install dependencies
         run: npm install
 
       - name: Build binary via pkg
         run: npm run build-binary
+        # → package.json に定義されたスクリプト:
+        #   "build-binary": "pkg index.js --targets node20-linux-x64 --output kenpo-watcher-linux"
 
-      # ↓ ここを必ずこう書く
-      - name: Upload binary
+      - name: Upload kenpo-watcher binary
         uses: actions/upload-artifact@v3
         with:
-          name: kenpo-watcher-binary
-          path: kenpo-watcher    # ← ここを pkg の出力ファイル名に合わせる
+          name: kenpo-watcher-binary   # ← Render 側で参照する artifact name
+          path: kenpo-watcher-linux    # ← 実際に出力されたファイル名
