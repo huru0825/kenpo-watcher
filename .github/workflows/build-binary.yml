@@ -23,4 +23,4 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: kenpo-watcher-binary   # ← render で参照する artifact 名
-          path: kenpo-watcher-linux     # ← ここを実際のファイル名に
+          path: kenpo-watcher     # ← ここを実際のファイル名に
