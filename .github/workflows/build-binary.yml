@@ -10,9 +10,9 @@ jobs:
       - name: Build binary via pkg
         run: npm run build-binary
 
-      
+      # ↓ ここを必ずこう書く
       - name: Upload binary
         uses: actions/upload-artifact@v3
         with:
           name: kenpo-watcher-binary
-          path: kenpo-watcher  
+          path: kenpo-watcher    # ← ここを pkg の出力ファイル名に合わせる
