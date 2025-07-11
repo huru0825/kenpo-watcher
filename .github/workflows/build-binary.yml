@@ -1,0 +1,26 @@
+name: Build and Publish Binary
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      # 依存インストールだけ行う（devDependencies 含む）
+      - name: Install deps
+        run: npm install
+
+      # binary をビルド
+      - name: Build binary via pkg
+        run: npm run build-binary
+
+      # バイナリをアーティファクト化
+      - name: Upload binary
+        uses: actions/upload-artifact@v3
+        with:
+          name: kenpo-watcher-binary
+          path: kenpo-watcher
