@@ -1,14 +1,15 @@
 {
   "name": "kenpo-watcher",
   "version": "1.0.0",
-  "main": "index.js",
   "scripts": {
-    "install": "npm install --prefer-offline --no-audit --progress=false --loglevel=verbose",
-    "start": "node index.js",
-    "postinstall": "puppeteer install"
+    "fetch-artifact": "node scripts/fetch-artifact.js",
+    "start": "node index.js"
   },
   "dependencies": {
     "puppeteer": "^21.3.8",
     "axios": "^1.4.0"
+  },
+  "devDependencies": {
+    "unzipper": "^0.10.11"
   }
 }
