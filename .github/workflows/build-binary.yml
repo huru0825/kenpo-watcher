@@ -10,17 +10,17 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      # 依存インストールだけ行う（devDependencies 含む）
+      # 依存インストール（pkg は devDependencies）
       - name: Install deps
-        run: npm install
+        run: npm ci
 
-      # binary をビルド
+      # pkg で Linux x64 バイナリを出力
       - name: Build binary via pkg
-        run: npm run build-binary
+        run: npx pkg . --targets node20-linux-x64 --output kenpo-watcher-linux
 
       # バイナリをアーティファクト化
       - name: Upload binary
         uses: actions/upload-artifact@v3
         with:
-          name: kenpo-watcher-binary
-          path: kenpo-watcher-linux
+          name: kenpo-watcher-binary   # ← render で参照する artifact 名
+          path: kenpo-watcher-linux     # ← ここを実際のファイル名に
