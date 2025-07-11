@@ -2,12 +2,12 @@
   "name": "kenpo-watcher",
   "version": "1.0.0",
   "scripts": {
-    "fetch-artifact": "node scripts/fetch-artifact.js",
-    "start":           "node index.js"
+    "build-binary": "pkg index.js --targets node20-linux-x64 --output kenpo-watcher"
   },
   "dependencies": {
-    "puppeteer": "^21.3.8",
-    "axios":     "^1.4.0",
-    "unzipper":  "^0.10.11"
+    "axios": "^1.4.0"
+  },
+  "devDependencies": {
+    "pkg": "^6.1.2"
   }
 }
