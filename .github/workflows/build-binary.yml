@@ -18,6 +18,8 @@ jobs:
         run: npm run build-binary
         # → package.json に定義されたスクリプト:
         #   "build-binary": "pkg index.js --targets node20-linux-x64 --output kenpo-watcher-linux"
+      - name: Debug: list build output
+      　　run: ls -l .
 
       - name: Upload kenpo-watcher binary
         uses: actions/upload-artifact@v3
