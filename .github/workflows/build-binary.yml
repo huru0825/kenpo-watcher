@@ -23,4 +23,4 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: kenpo-watcher-binary
-          path: kenpo-watcher
+          path: kenpo-watcher-linux
