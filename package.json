@@ -2,7 +2,7 @@
   "name": "kenpo-watcher",
   "version": "1.0.0",
   "scripts": {
-    "fetch-artifact": "node src/scripts/fetch-artifact.js",
+    "fetch-artifact": "node scripts/fetch-artifact.js",
     "start": "node src/index.js"
   },
   "dependencies": {
