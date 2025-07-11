@@ -2,8 +2,8 @@
   "name": "kenpo-watcher",
   "version": "1.0.0",
   "scripts": {
-    "build-binary": "pkg index.js --targets node16-linux-x64 --output kenpo-watcher-linux"
-  },
+  "build-binary": "pkg index.js --targets node20-linux-x64 --output kenpo-watcher"
+},
   "dependencies": {
     "axios": "^1.4.0"
   },
