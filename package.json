@@ -2,7 +2,7 @@
   "name": "kenpo-watcher",
   "version": "1.0.0",
   "scripts": {
-    "bundle": "esbuild index.js --bundle --platform=node --outdir=dist --external:typescript --external:cosmiconfig",
+    "bundle": "esbuild index.js --bundle --platform=node --outdir=dist",
     "build-binary": "pkg dist/index.js --targets node16-linux-x64 --output kenpo-watcher"
   },
   "dependencies": {
@@ -10,8 +10,7 @@
     "puppeteer": "^21.3.8"
   },
   "devDependencies": {
-    "pkg": "^5.8",
-    "esbuild": "^0.19.2",
-    "typescript": "^5.1.6"
+    "pkg": "^5.8.0",
+    "esbuild": "^0.19.2"
   }
 }
