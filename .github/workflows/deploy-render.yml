@@ -16,7 +16,7 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: kenpo-watcher-binary
-          path: .
+          path: kenpo-watcher-linux
 
       - name: Deploy to Render
         env:
