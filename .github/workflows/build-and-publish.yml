@@ -1,33 +1,23 @@
+# .github/workflows/build-and-publish.yml
 name: Build and Publish Binary
-
 on:
   push:
     branches: [ main ]
-
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v3
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '16'
 
       - name: Install dependencies
         run: npm install
 
-      - name: Bundle with esbuild
-        run: npm run bundle
+      - name: Build binary via pkg
+        run: pkg index.js --targets node16-linux-x64 --output kenpo-watcher
 
-      - name: Build binary with pkg
-        run: npm run build-binary
-
-      - name: Upload binary artifact
-        uses: actions/upload-artifact@v3
+      - name: Upload kenpo-watcher binary
+        uses: actions/upload-artifact@v4
         with:
           name: kenpo-watcher-binary
           path: kenpo-watcher
