@@ -10,7 +10,7 @@
     "puppeteer": "^21.3.8"
   },
   "devDependencies": {
-    "pkg": "^5.8.0",
-    "esbuild": "^0.19.2"
+    "esbuild": "^0.19.2",
+    "pkg": "^5.8.0"
   }
 }
