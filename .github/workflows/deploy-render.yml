@@ -1,7 +1,6 @@
 # .github/workflows/deploy-render.yml
 name: Deploy to Render
 
-# “Build and Publish Binary” ワークフローが成功したタイミングで動く
 on:
   workflow_run:
     workflows: ["Build and Publish Binary"]
@@ -9,7 +8,6 @@ on:
 
 jobs:
   deploy:
-    # 前段のビルドが成功した場合のみ実行
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
 
@@ -17,13 +15,13 @@ jobs:
       - name: Download binary artifact
         uses: actions/download-artifact@v3
         with:
-          name: kenpo-watcher-binary    # ← build-binary.yml の upload-artifact で指定した artifact 名
+          name: kenpo-watcher-binary
           path: .
 
       - name: Deploy to Render
         env:
-          RENDER_API_KEY:   ${{ secrets.RENDER_API_KEY }}
-          RENDER_SERVICE_ID:${{ secrets.RENDER_SERVICE_ID }}
+          RENDER_API_KEY:    ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
         run: |
           curl -X POST "https://api.render.com/v1/services/$RENDER_SERVICE_ID/deploys" \
             -H "Authorization: Bearer $RENDER_API_KEY" \
