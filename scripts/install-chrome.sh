@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -eux
 
+# ── キャッシュディレクトリ作成 ──
+mkdir -p /var/lib/apt/lists/partial
+
 # ── 依存パッケージを更新／インストール ──
 apt-get update
 apt-get install -y wget gnupg2
