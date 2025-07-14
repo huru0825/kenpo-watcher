@@ -1,0 +1,5 @@
+services:
+  - type: web_service
+    name: kenpo-watcher
+    env: docker
+    dockerfilePath: Dockerfile
