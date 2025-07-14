@@ -42,7 +42,7 @@ const DAY_FILTER = DAY_MAP[DAY_FILTER_RAW] || null;
 (async () => {
   console.log('🔄 Launching browser...');
   const browser = await puppeteer.launch({
-    headless: true,
+    headless: 'new',
     executablePath: CHROME_PATH,
     args: ['--no-sandbox', '--disable-setuid-sandbox']
   });
