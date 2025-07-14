@@ -11,6 +11,7 @@
   },
   "devDependencies": {
     "esbuild": "^0.19.2",
-    "pkg": "^5.8.0"
+    "pkg": "^5.8.0",
+    "typescript": "^5.0.0"
   }
 }
