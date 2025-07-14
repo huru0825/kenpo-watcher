@@ -13,8 +13,11 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Bundle with esbuild
+        run: npm run bundle  # dist/index.js を生成
+
       - name: Build binary via pkg
-        run: pkg index.js --targets node16-linux-x64 --output kenpo-watcher
+        run: npm run build-binary  # package.json のスクリプトを利用
 
       - name: Upload kenpo-watcher binary
         uses: actions/upload-artifact@v4
