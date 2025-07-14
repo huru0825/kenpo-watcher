@@ -1,16 +1,15 @@
 #!/usr/bin/env bash
-set -o errexit
+set -eux
 
-STORAGE_DIR=/opt/render/project/.render
+# ── 依存パッケージを更新／インストール ──
+apt-get update
+apt-get install -y wget gnupg2
 
-if [[ ! -d $STORAGE_DIR/chrome ]]; then
-  echo "...Downloading Chrome"
-  mkdir -p $STORAGE_DIR/chrome
-  cd $STORAGE_DIR/chrome
-  wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-  dpkg -x google-chrome-stable_current_amd64.deb $STORAGE_DIR/chrome
-  rm google-chrome-stable_current_amd64.deb
-  cd $HOME/project/src
-else
-  echo "...Using Chrome from cache"
-fi
+# ── Google Chrome のダウンロード ──
+wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+
+# ── インストール（依存エラーがあれば自動解決） ──
+dpkg -i google-chrome-stable_current_amd64.deb || apt-get install -f -y
+
+# ── 後片付け ──
+rm google-chrome-stable_current_amd64.deb
