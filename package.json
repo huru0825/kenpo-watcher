@@ -2,7 +2,7 @@
   "name": "kenpo-watcher",
   "version": "1.0.0",
   "scripts": {
-    "bundle": "esbuild index.js --bundle --platform=node --outdir=dist",
+    "bundle": "esbuild index.js --bundle --platform=node --outdir=dist --external:filePath --external:t2.extends --external:path2",
     "build-binary": "pkg dist/index.js --targets node16-linux-x64 --output kenpo-watcher"
   },
   "dependencies": {
