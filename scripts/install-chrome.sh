@@ -1,12 +1,24 @@
 #!/usr/bin/env bash
 set -eux
 
-# Chrome DEB をローカルに取得
-wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+# 必要パッケージのインストール
+apt-get update
+apt-get install -y \
+  wget \
+  apt-transport-https \
+  gnupg \
+  ca-certificates
 
-# 作業ディレクトリを作成して展開
-mkdir -p chrome
-dpkg-deb -x google-chrome-stable_current_amd64.deb chrome/
+# Google の公開鍵を登録
+wget -qO- https://dl.google.com/linux/linux_signing_key.pub | apt-key add -
 
-# 実行パスを通す
-export PUPPETEER_EXECUTABLE_PATH="$(pwd)/chrome/opt/google/chrome/google-chrome"
+# リポジトリを追加
+echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" \
+  > /etc/apt/sources.list.d/google-chrome.list
+
+# インストール
+apt-get update
+apt-get install -y google-chrome-stable
+
+# パーミッション調整
+chmod +x /usr/bin/google-chrome-stable
