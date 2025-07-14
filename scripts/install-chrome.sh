@@ -1,18 +1,12 @@
 #!/usr/bin/env bash
 set -eux
 
-# ── キャッシュディレクトリ作成 ──
-mkdir -p /var/lib/apt/lists/partial
-
-# ── 依存パッケージを更新／インストール ──
-apt-get update
-apt-get install -y wget gnupg2
-
-# ── Google Chrome のダウンロード ──
+# Chrome DEB をローカルに取得
 wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
 
-# ── インストール（依存エラーがあれば自動解決） ──
-dpkg -i google-chrome-stable_current_amd64.deb || apt-get install -f -y
+# 作業ディレクトリを作成して展開
+mkdir -p chrome
+dpkg-deb -x google-chrome-stable_current_amd64.deb chrome/
 
-# ── 後片付け ──
-rm google-chrome-stable_current_amd64.deb
+# 実行パスを通す
+export PUPPETEER_EXECUTABLE_PATH="$(pwd)/chrome/opt/google/chrome/google-chrome"
