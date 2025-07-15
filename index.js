@@ -49,7 +49,7 @@ const DAY_FILTER       = DAY_MAP[DAY_FILTER_RAW] || null;
     await page.goto(TARGET_URL, { waitUntil: 'networkidle2', timeout: 60000 });
 
     // --- reCAPTCHA（画像認証）検知 ---
-    const hasAnchor       = await page.$('iframe[src*="/recaptcha/api2/anchor"]');
+    const hasAnchor          = await page.$('iframe[src*="/recaptcha/api2/anchor"]');
     const hasImageChallenge = await page.$('iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect');
     if (hasImageChallenge && !hasAnchor) {
       console.warn('🔴 画像認証チャレンジ検知 → 即終了');
@@ -59,8 +59,8 @@ const DAY_FILTER       = DAY_MAP[DAY_FILTER_RAW] || null;
     console.log('🟢 reCAPTCHA チェックボックスのみ or none → 続行');
 
     // ○アイコンがあるリンクを抽出
-    const availableDates = await page.evaluate(() => {
-      return Array.from(document.querySelectorAll('img'))
+    const availableDates = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('img'))
         .filter(img => img.src.includes('icon_circle.png'))
         .map(img => {
           const a = img.closest('a');
@@ -68,8 +68,8 @@ const DAY_FILTER       = DAY_MAP[DAY_FILTER_RAW] || null;
             ? { href: a.href, label: a.textContent.trim() }
             : null;
         })
-        .filter(Boolean);
-    });
+        .filter(Boolean)
+    );
 
     const matched = [];
 
@@ -92,10 +92,10 @@ const DAY_FILTER       = DAY_MAP[DAY_FILTER_RAW] || null;
         }
 
         // 施設リンクの有無をチェック
-        const facilityFound = await page.evaluate(name => {
-          return Array.from(document.querySelectorAll('a'))
-            .some(a => a.textContent.includes(name));
-        }, TARGET_FACILITY_NAME);
+        const facilityFound = await page.evaluate(name =>
+          Array.from(document.querySelectorAll('a'))
+            .some(a => a.textContent.includes(name))
+        , TARGET_FACILITY_NAME);
 
         if (facilityFound) {
           matched.push(label);
