@@ -1,24 +1,18 @@
 #!/usr/bin/env bash
-set -eux
+set -euxo pipefail
 
-# 必要パッケージのインストール
-apt-get update
-apt-get install -y \
-  wget \
-  apt-transport-https \
-  gnupg \
-  ca-certificates
+echo "[install-chrome.sh] start"
 
-# Google の公開鍵を登録
-wget -qO- https://dl.google.com/linux/linux_signing_key.pub | apt-key add -
+# 1. .deb をダウンロード（すでにあればスキップ）
+if [ ! -f google-chrome-stable_current_amd64.deb ]; then
+  curl -SL -o google-chrome-stable_current_amd64.deb \
+    https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+fi
 
-# リポジトリを追加
-echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" \
-  > /etc/apt/sources.list.d/google-chrome.list
+# 2. 展開先ディレクトリを作成
+mkdir -p chrome/opt/google/chrome
 
-# インストール
-apt-get update
-apt-get install -y google-chrome-stable
+# 3. dpkg-deb で展開（詳細ログが出る）
+dpkg-deb -x google-chrome-stable_current_amd64.deb chrome/opt/google/chrome
 
-# パーミッション調整
-chmod +x /usr/bin/google-chrome-stable
+echo "[install-chrome.sh] end"
