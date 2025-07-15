@@ -3,16 +3,18 @@ set -euxo pipefail
 
 echo "[install-chrome.sh] start"
 
-# 1. .deb をダウンロード（すでにあればスキップ）
-if [ ! -f google-chrome-stable_current_amd64.deb ]; then
-  curl -SL -o google-chrome-stable_current_amd64.deb \
+CACHE_DIR="$(pwd)/.cache/puppeteer"
+TARGET_DEB="google-chrome-stable_current_amd64.deb"
+
+# ← ここで既存キャッシュをクリアしている
+rm -rf "$CACHE_DIR"
+mkdir -p "$CACHE_DIR"
+
+# （以降は同じ）
+if [ ! -f "$TARGET_DEB" ]; then
+  curl -SL -o "$TARGET_DEB" \
     https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
 fi
+dpkg-deb -x "$TARGET_DEB" "$CACHE_DIR"
 
-# 2. 展開先ディレクトリを作成
-mkdir -p chrome/opt/google/chrome
-
-# 3. dpkg-deb で展開（詳細ログが出る）
-dpkg-deb -x google-chrome-stable_current_amd64.deb chrome/opt/google/chrome
-
-echo "[install-chrome.sh] end"
+echo "[install-chrome.sh] end (extracted to $CACHE_DIR)"
