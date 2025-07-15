@@ -1,7 +1,8 @@
 // puppeteer.config.cjs
+const path = require('path');
+
 module.exports = {
-  // Puppeteer v19+ はデフォルトで ~/.cache/puppeteer を使うが、
-  // ここでプロジェクト内に固定する
-  cacheDirectory: './.cache/puppeteer',
-  // もしその他オプションがあればここに追加
+  // Puppeteer がダウンロードした Chrome を置くディレクトリを
+  // プロジェクト直下の .cache/puppeteer に固定する
+  cacheDirectory: path.resolve(__dirname, '.cache/puppeteer')
 };
