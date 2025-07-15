@@ -2,12 +2,12 @@ const puppeteer = require('puppeteer');
 const axios = require('axios');
 
 // === 環境変数の取得（RenderのGUIで設定）===
-const TARGET_URL = process.env.TARGET_URL;
-const GAS_WEBHOOK_URL = process.env.GAS_WEBHOOK_URL;
-const TARGET_FACILITY_NAME = process.env.TARGET_FACILITY_NAME || '';
-const DAY_FILTER_RAW = process.env.DAY_FILTER || '土曜日';
-const DATE_FILTER_RAW = process.env.DATE_FILTER || '';
-const CHROME_PATH = process.env.PUPPETEER_EXECUTABLE_PATH;
+const TARGET_URL             = process.env.TARGET_URL;
+const GAS_WEBHOOK_URL        = process.env.GAS_WEBHOOK_URL;
+const TARGET_FACILITY_NAME   = process.env.TARGET_FACILITY_NAME || '';
+const DAY_FILTER_RAW         = process.env.DAY_FILTER || '土曜日';
+const DATE_FILTER_RAW        = process.env.DATE_FILTER || '';
+const CHROME_PATH            = process.env.PUPPETEER_EXECUTABLE_PATH;
 
 // === 曜日マップ（日本語 → 英語）===
 const DAY_MAP = {
@@ -25,18 +25,20 @@ function normalizeDates(raw) {
   return raw
     .replace(/、/g, ',')
     .split(',')
-    .map(d => d.trim())
+    .map(function(d) { return d.trim(); })
     .filter(Boolean)
-    .map(date => {
+    .map(function(date) {
       const match = date.match(/^(\d{1,2})月(\d{1,2})日$/);
       if (!match) return null;
-      const [, month, day] = match;
-      return `${month.padStart(2, '0')}月${day.padStart(2, '0')}日`;
+      const month = match[1].padStart(2, '0');
+      const day   = match[2].padStart(2, '0');
+      return `${month}月${day}日`;
     })
     .filter(Boolean);
 }
 
 const DATE_FILTER_LIST = normalizeDates(DATE_FILTER_RAW);
+// 英語に変換した曜日フィルタ（該当がなければ null）
 const DAY_FILTER = DAY_MAP[DAY_FILTER_RAW] || null;
 
 (async () => {
@@ -51,34 +53,39 @@ const DAY_FILTER = DAY_MAP[DAY_FILTER_RAW] || null;
   const page = await browser.newPage();
   await page.goto(TARGET_URL, { waitUntil: 'networkidle2', timeout: 60000 });
 
-  // ○アイコンがあるリンクを抽出
-  const availableDates = await page.$$eval('img', imgs =>
-    imgs
-      .filter(img => img.src.includes('icon_circle.png'))
-      .map(img => {
+  // ○アイコンがあるリンクを抽出（シリアライズ可能な関数で実装）
+  const availableDates = await page.$$eval('img', function(imgs) {
+    return imgs
+      .filter(function(img) { return img.src.includes('icon_circle.png'); })
+      .map(function(img) {
         const link = img.closest('a');
-        const text = link ? link.textContent.trim() : '';
-        return { href: link.href, label: text };
-      })
-  );
+        return {
+          href: link ? link.href : '',
+          label: link ? link.textContent.trim() : ''
+        };
+      });
+  });
 
   const matched = [];
 
-  for (const date of availableDates) {
-    const { href, label } = date;
-    const matchedByDate = DATE_FILTER_LIST.some(d => label.includes(d));
-    const matchedByDay = DAY_FILTER && label.includes(DAY_FILTER_RAW);
+  for (const dateInfo of availableDates) {
+    const href  = dateInfo.href;
+    const label = dateInfo.label;
+    const byDate = DATE_FILTER_LIST.some(function(d) { return label.includes(d); });
+    const byDay  = DAY_FILTER && label.includes(DAY_FILTER);
 
+    // 日付フィルタ or 曜日フィルタに一致するものだけ処理
     if (
-      (DATE_FILTER_LIST.length > 0 && matchedByDate) ||
-      (DATE_FILTER_LIST.length === 0 && matchedByDay)
+      (DATE_FILTER_LIST.length > 0 && byDate) ||
+      (DATE_FILTER_LIST.length === 0 && byDay)
     ) {
       await page.goto(href, { waitUntil: 'networkidle2', timeout: 60000 });
 
-      const facilityFound = await page.evaluate(facilityName => {
-        return Array.from(document.querySelectorAll('a')).some(a =>
-          a.textContent.includes(facilityName)
-        );
+      // 施設名がリンクに含まれているかチェック
+      const facilityFound = await page.evaluate(function(name) {
+        return Array.from(document.querySelectorAll('a')).some(function(a) {
+          return a.textContent.includes(name);
+        });
       }, TARGET_FACILITY_NAME);
 
       if (facilityFound) {
@@ -89,6 +96,7 @@ const DAY_FILTER = DAY_MAP[DAY_FILTER_RAW] || null;
     }
   }
 
+  // 一致した日程を通知
   for (const hit of matched) {
     const message = `✅ ${DAY_FILTER_RAW}：空きあり「${TARGET_FACILITY_NAME}」\n${hit}\n\n${TARGET_URL}`;
     await axios.post(GAS_WEBHOOK_URL, { message });
