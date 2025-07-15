@@ -2,12 +2,13 @@
   "name": "kenpo-watcher",
   "version": "1.0.0",
   "scripts": {
+    "postinstall": "npx puppeteer install chrome",
     "bundle": "esbuild index.js --bundle --platform=node --outdir=dist --external:filePath --external:t2.extends --external:path2",
     "build-binary": "pkg dist/index.js --targets node16-linux-x64 --output kenpo-watcher"
   },
   "dependencies": {
     "axios": "^1.4.0",
-    "puppeteer": "^21.3.8"
+    "puppeteer": "^21.11.0"
   },
   "devDependencies": {
     "esbuild": "^0.19.2",
