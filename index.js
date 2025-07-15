@@ -1,5 +1,5 @@
 const puppeteer = require('puppeteer');
-const axios    = require('axios');
+const axios       = require('axios');
 
 // === 環境変数の取得（RenderのGUIで設定）===
 const TARGET_URL           = process.env.TARGET_URL;
@@ -8,9 +8,6 @@ const TARGET_FACILITY_NAME = process.env.TARGET_FACILITY_NAME || '';
 const DAY_FILTER_RAW       = process.env.DAY_FILTER || '土曜日';
 const DATE_FILTER_RAW      = process.env.DATE_FILTER || '';
 const CHROME_PATH          = process.env.PUPPETEER_EXECUTABLE_PATH;
-// リトライ設定（任意、デフォルトは3回・5分）
-const MAX_RETRIES          = parseInt(process.env.MAX_RETRIES || '3', 10);
-const RETRY_DELAY_MS       = parseInt(process.env.RETRY_DELAY_MINUTES || '5', 10) * 60_000;
 
 // === 曜日マップ（日本語 → 英語）===
 const DAY_MAP = {
@@ -38,21 +35,6 @@ function normalizeDates(raw) {
 const DATE_FILTER_LIST = normalizeDates(DATE_FILTER_RAW);
 const DAY_FILTER       = DAY_MAP[DAY_FILTER_RAW] || null;
 
-// === reCAPTCHA 検出＆リトライ付き goto 関数 ===
-async function safeGoto(page, url, opts = {}) {
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    await page.goto(url, opts);
-    // ページ上に reCAPTCHA widget があるかチェック
-    const captcha = await page.$('iframe[src*="recaptcha"]');
-    if (!captcha) return;
-    console.warn(`⚠️ reCAPTCHA detected on ${url}, retrying in ${RETRY_DELAY_MS/60000}min (attempt ${attempt}/${MAX_RETRIES})`);
-    if (attempt < MAX_RETRIES) {
-      await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
-    }
-  }
-  console.error(`❌ Unable to bypass reCAPTCHA after ${MAX_RETRIES} attempts`);
-}
-
 ;(async () => {
   console.log('🔄 Launching browser...');
   const browser = await puppeteer.launch({
@@ -63,9 +45,18 @@ async function safeGoto(page, url, opts = {}) {
   console.log('✅ Browser launched');
 
   const page = await browser.newPage();
-  await safeGoto(page, TARGET_URL, { waitUntil: 'networkidle2', timeout: 60000 });
 
-  // ○アイコンがあるリンクを抽出
+  // --- トップページ到達後、reCAPTCHA widget のチェック ---
+  await page.goto(TARGET_URL, { waitUntil: 'networkidle2', timeout: 60000 });
+  // ページ内にreCAPTCHAウィジェット要素があれば即終了
+  const recaptchaWidget = await page.$('.g-recaptcha, #recaptcha, iframe[src*="recaptcha"]');
+  if (recaptchaWidget) {
+    console.log('⚠️ 画像認証フォーム（reCAPTCHA）が検出されたため、即終了します。');
+    await browser.close();
+    process.exit(0);
+  }
+
+  // --- ○アイコンがあるリンクを抽出 (serialize-able function literal) ---
   const availableDates = await page.evaluate(() => {
     return Array.from(document.querySelectorAll('img'))
       .filter(img => img.src.includes('icon_circle.png'))
@@ -86,18 +77,20 @@ async function safeGoto(page, url, opts = {}) {
 
     if ((DATE_FILTER_LIST.length > 0 && byDate) ||
         (DATE_FILTER_LIST.length === 0 && byDay)) {
-      await safeGoto(page, href, { waitUntil: 'networkidle2', timeout: 60000 });
+      await page.goto(href, { waitUntil: 'networkidle2', timeout: 60000 });
 
+      // 施設名検索 (serialize-able function literal)
       const facilityFound = await page.evaluate(name => {
         return Array.from(document.querySelectorAll('a'))
           .some(a => a.textContent.includes(name));
       }, TARGET_FACILITY_NAME);
 
       if (facilityFound) matched.push(label);
-      await safeGoto(page, TARGET_URL, { waitUntil: 'networkidle2', timeout: 60000 });
+      await page.goBack({ waitUntil: 'networkidle2', timeout: 60000 });
     }
   }
 
+  // --- マッチした日付ごとに通知 ---
   for (const hit of matched) {
     const message = `✅ ${DAY_FILTER_RAW}：空きあり「${TARGET_FACILITY_NAME}」\n${hit}\n\n${TARGET_URL}`;
     await axios.post(GAS_WEBHOOK_URL, { message });
