@@ -1,14 +1,13 @@
 const express = require('express');
-const { run }  = require('./index.js');       // 既存のメイン処理
-// const { runBenchmark } = require('./benchmark'); // ベンチマーク処理
-const app     = express();
+const { run } = require('./index.js');
+const app = express();
 
-// ヘルスチェック用エンドポイント
+// ヘルスチェック
 app.get('/health', (req, res) => {
   res.send('OK');
 });
 
-// --- 既存：スクリプト実行トリガー用エンドポイント ---
+// スクリプト実行トリガー
 app.get('/run', async (req, res) => {
   try {
     await run();
@@ -19,20 +18,22 @@ app.get('/run', async (req, res) => {
   }
 });
 
-/* ★あとで消す：ベンチマーク専用エンドポイント ※CRON ジョブから叩く★
-app.get('/benchmark', async (req, res) => {
+// ベンチマーク用エンドポイント
+app.get('/run-once', async (req, res) => {
+  const start = Date.now();
   try {
-    const result = await runBenchmark();
-    res.status(200).json({ status: 'ok', result });
+    await run();
+    const elapsed = ((Date.now() - start) / 1000).toFixed(2);
+    console.log(`⏱ 実行完了まで ${elapsed}s`);
+    res.send(`OK: ${elapsed}s`);
   } catch (err) {
-    console.error('Benchmark error:', err);
-    res.status(500).json({ status: 'error', error: err.message });
+    console.error(err);
+    res.status(500).send(err.message);
   }
 });
-// ★ここまで消す★
-*/
 
-const port = process.env.PORT || 10000;
+// ポートバインド
+const port = process.env.PORT || 3000;
 app.listen(port, () => {
   console.log(`Server listening on port ${port}`);
 });
