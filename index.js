@@ -19,138 +19,134 @@ function normalizeDates(raw) {
   return raw
     .replace(/、/g, ',')
     .split(',')
-    .map(function(d) { return d.trim(); })
+    .map(d => d.trim())
     .filter(Boolean)
-    .map(function(date) {
-      var m = date.match(/^(\d{1,2})月(\d{1,2})日$/);
-      return m ? m[1].padStart(2, '0') + '月' + m[2].padStart(2, '0') + '日' : null;
+    .map(date => {
+      const m = date.match(/^(\d{1,2})月(\d{1,2})日$/);
+      return m
+        ? m[1].padStart(2, '0') + '月' + m[2].padStart(2, '0') + '日'
+        : null;
     })
     .filter(Boolean);
 }
 
 // === 日本語→英語曜マップ ===
-var DAY_MAP = {
+const DAY_MAP = {
   '日曜日': 'Sunday','月曜日': 'Monday','火曜日': 'Tuesday',
   '水曜日': 'Wednesday','木曜日': 'Thursday',
   '金曜日': 'Friday','土曜日': 'Saturday'
 };
+const DATE_FILTER_LIST = normalizeDates(DATE_FILTER_RAW);
+const DAY_FILTER       = DAY_MAP[DAY_FILTER_RAW] || null;
+const TARGET_DAY_RAW   = DAY_FILTER_RAW;
 
-var DATE_FILTER_LIST = normalizeDates(DATE_FILTER_RAW);
-var DAY_FILTER       = DAY_MAP[DAY_FILTER_RAW] || null;
-var TARGET_DAY_RAW   = DAY_FILTER_RAW;
+// ===== 月訪問ロジック =====
+async function visitMonth(page, includeDateFilter) {
+  // reCAPTCHA 検知
+  const anchor    = await page.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout: 1000 }).catch(() => null);
+  const challenge = await page.waitForSelector('iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect', { timeout: 1000 }).catch(() => null);
+  if (challenge && !anchor) return []; // 画像認証チャレンジが来たら中断
 
-// メイン処理を関数化
+  // ○アイコンのある日リンクを全部拾う
+  const available = await page.evaluate(() => {
+    return Array.from(document.querySelectorAll('a'))
+      .filter(a => a.querySelector('img[src*="icon_circle.png"]'))
+      .map(a => ({ href: a.href, label: a.textContent.trim() }));
+  });
+
+  const hits = [];
+  for (const { href, label } of available) {
+    const byDate = includeDateFilter && DATE_FILTER_LIST.some(d => label.includes(d));
+    const byDay  = !DATE_FILTER_LIST.length && DAY_FILTER && label.includes(TARGET_DAY_RAW);
+    if (byDate || byDay) {
+      await page.goto(href, { waitUntil: 'networkidle2', timeout: 60000 });
+      // 詳細ページの reCAPTCHA 検知
+      const ia = await page.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout: 1000 }).catch(() => null);
+      const ii = await page.waitForSelector('iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect', { timeout: 1000 }).catch(() => null);
+      if (ii && !ia) {
+        await page.goBack({ waitUntil: 'networkidle2', timeout: 60000 });
+        continue;
+      }
+      // 施設名チェック
+      const found = await page.evaluate(name =>
+        Array.from(document.querySelectorAll('a')).some(a => a.textContent.includes(name)),
+        TARGET_FACILITY_NAME
+      );
+      if (found) hits.push(label);
+      await page.goBack({ waitUntil: 'networkidle2', timeout: 60000 });
+    }
+  }
+  return hits;
+}
+
+// ===== navigation helpers =====
+async function clickNext(page) {
+  await page.click('input[id=nextMonth]');
+  await page.waitForResponse(resp => resp.url().includes('/calendar_apply/calendar_select'));
+}
+async function clickPrev(page) {
+  await page.click('input[id=prevMonth]');
+  await page.waitForResponse(resp => resp.url().includes('/calendar_apply/calendar_select'));
+}
+
+// ===== メイン処理 =====
 module.exports.run = async function() {
-  var browser;
+  let browser;
   try {
-    console.log('🔄 Launching browser...', CHROME_PATH);
     browser = await puppeteer.launch({
       headless: 'new',
       executablePath: CHROME_PATH,
       args: ['--no-sandbox','--disable-setuid-sandbox','--disable-dev-shm-usage'],
-      env: Object.assign({}, process.env, { PUPPETEER_SKIP_DOWNLOAD: 'true' })
+      env: { ...process.env, PUPPETEER_SKIP_DOWNLOAD: 'true' }
     });
-    console.log('✅ Browser launched');
 
-    var page = await browser.newPage();
+    const page = await browser.newPage();
     await page.goto(TARGET_URL, { waitUntil: 'networkidle2', timeout: 60000 });
 
-    // --- reCAPTCHA（画像認証）検知 ---
-    var anchorFrame = await page.waitForSelector(
-      'iframe[src*="/recaptcha/api2/anchor"]',
-      { timeout: 1000 }
-    ).catch(function() { return null; });
-    var imageFrame  = await page.waitForSelector(
-      'iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect',
-      { timeout: 1000 }
-    ).catch(function() { return null; });
-    if (imageFrame && !anchorFrame) {
-      console.warn('🔴 画像認証チャレンジ検知 → 即終了');
-      return;
+    // セッション切れ対応
+    if (page.url().endsWith('/service_category/index')) {
+      console.warn('⚠️ セッション切れ検知 → カレンダーリンクをクリック');
+      await page.click('a[href*="/calendar_apply"]');
+      await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 60000 });
     }
-    console.log('🟢 reCAPTCHA チェックボックスのみ or none → 続行');
 
-    // ○アイコンがあるリンクを取得（page.evaluate 内で DOM 操作）
-    var availableDates = await page.evaluate(function() {
-      var arr = [];
-      var anchors = Array.prototype.slice.call(document.querySelectorAll('a'));
-      for (var i = 0; i < anchors.length; i++) {
-        var a = anchors[i];
-        if (a.querySelector('img[src*="icon_circle.png"]')) {
-          arr.push({ href: a.href, label: a.textContent.trim() });
+    // 巡回シーケンス（7月→8月→9月→8月→7月）
+    const sequence = [
+      { action: null,      includeDate: true  }, // 当月：日付＋曜日フィルタ
+      { action: clickNext, includeDate: false }, // 翌月：曜日のみ
+      { action: clickNext, includeDate: false }, // +2月：曜日のみ
+      { action: clickPrev, includeDate: false }, // +1月：曜日のみ
+      { action: clickPrev, includeDate: true  }  // 当月に戻って日付＋曜日フィルタ
+    ];
+
+    // 重複排除しつつ集約
+    const notified = new Set();
+    for (const step of sequence) {
+      if (step.action) await step.action(page);
+      const hits = await visitMonth(page, step.includeDate);
+      for (const label of hits) {
+        if (!notified.has(label)) {
+          notified.add(label);
+          const msg =
+            `【${TARGET_FACILITY_NAME}】予約状況更新\n` +
+            `日付：${label}\n` +
+            `詳細はこちら▶︎ ${TARGET_URL}`;
+          await axios.post(GAS_WEBHOOK_URL, { message: msg });
         }
-      }
-      return arr;
-    });
-
-    var matched = [];
-    for (var idx = 0; idx < availableDates.length; idx++) {
-      var href  = availableDates[idx].href;
-      var label = availableDates[idx].label;
-
-      // 日付フィルタ判定
-      var byDate = false;
-      if (DATE_FILTER_LIST.length > 0) {
-        for (var j = 0; j < DATE_FILTER_LIST.length; j++) {
-          if (label.indexOf(DATE_FILTER_LIST[j]) !== -1) {
-            byDate = true;
-            break;
-          }
-        }
-      }
-
-      // 曜日フィルタ判定
-      var byDay = false;
-      if (DATE_FILTER_LIST.length === 0 && DAY_FILTER) {
-        byDay = (label.indexOf(TARGET_DAY_RAW) !== -1);
-      }
-
-      if (byDate || byDay) {
-        await page.goto(href, { waitUntil: 'networkidle2', timeout: 60000 });
-
-        // 詳細ページでの reCAPTCHA 検知
-        var innerAnchor = await page.waitForSelector(
-          'iframe[src*="/recaptcha/api2/anchor"]',
-          { timeout: 1000 }
-        ).catch(function() { return null; });
-        var innerImage = await page.waitForSelector(
-          'iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect',
-          { timeout: 1000 }
-        ).catch(function() { return null; });
-        if (innerImage && !innerAnchor) {
-          console.warn('🔴 詳細ページで画像認証検知 → スキップ');
-          await page.goBack({ waitUntil: 'networkidle2', timeout: 60000 });
-          continue;
-        }
-
-        // 施設名リンクの有無判定（page.evaluate で引数渡し）
-        var found = await page.evaluate(function(facilityName) {
-          var anchors2 = Array.prototype.slice.call(document.querySelectorAll('a'));
-          for (var k = 0; k < anchors2.length; k++) {
-            if (anchors2[k].textContent.indexOf(facilityName) !== -1) {
-              return true;
-            }
-          }
-          return false;
-        }, TARGET_FACILITY_NAME);
-
-        if (found) matched.push(label);
-        await page.goBack({ waitUntil: 'networkidle2', timeout: 60000 });
       }
     }
 
-    // マッチあれば Webhook 送信
-    for (var m = 0; m < matched.length; m++) {
-      var hit = matched[m];
-      var message = '✅ ' + TARGET_DAY_RAW + '：空きあり「' + TARGET_FACILITY_NAME + '」\n' +
-                    hit + '\n\n' + TARGET_URL;
-      await axios.post(GAS_WEBHOOK_URL, { message: message });
+    // ヒットなしならテスト通知
+    if (notified.size === 0) {
+      await axios.post(GAS_WEBHOOK_URL, {
+        message: `ℹ️ ${TARGET_FACILITY_NAME} の空きはありませんでした。\n監視URL▶︎ ${TARGET_URL}`
+      });
     }
 
   } catch (err) {
-    console.error('❌ Exception caught:', err);
-    var text = err.stack || err.message || String(err);
-    await axios.post(GAS_WEBHOOK_URL, { message: '⚠️ Error occurred:\n' + text });
+    // 例外も一つの通知にまとめる
+    const text = err.stack || err.message || String(err);
+    await axios.post(GAS_WEBHOOK_URL, { message: '⚠️ エラーが発生しました：\n' + text });
     process.exit(1);
   } finally {
     if (browser) await browser.close();
