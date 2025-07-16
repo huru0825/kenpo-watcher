@@ -1,7 +1,7 @@
 const puppeteer = require('puppeteer');
 const axios     = require('axios');
 
-// === 環境変数の取得（RenderのGUIで設定）===
+// === 環境変数の取得（RenderのGUIで設定）==
 const TARGET_URL           = process.env.TARGET_URL;
 const GAS_WEBHOOK_URL      = process.env.GAS_WEBHOOK_URL;
 const TARGET_FACILITY_NAME = process.env.TARGET_FACILITY_NAME || '';
