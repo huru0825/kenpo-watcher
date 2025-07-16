@@ -7,12 +7,15 @@
     "build-binary": "pkg dist/index.js --targets node16-linux-x64 --output kenpo-watcher"
   },
   "dependencies": {
-    "axios": "^1.4.0",
-    "puppeteer": "^21.11.0"
+    "axios": "^1.10.0",
+    "puppeteer": "^21.11.0",
+    "follow-redirects": "^1.15.9",
+    "form-data": "^4.0.3",
+    "proxy-from-env": "^1.1.0"
   },
   "devDependencies": {
-    "esbuild": "^0.19.2",
-    "pkg": "^5.8.0",
-    "typescript": "^5.0.0"
+    "esbuild": "^0.19.12",
+    "pkg": "^5.8.1",
+    "typescript": "^5.8.3"
   }
 }
