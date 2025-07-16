@@ -1,6 +1,6 @@
 const express = require('express');
 const { run }  = require('./index.js');       // 既存のメイン処理
-const { runBenchmark } = require('./benchmark'); // ベンチマーク処理
+// const { runBenchmark } = require('./benchmark'); // ベンチマーク処理
 const app     = express();
 
 // ヘルスチェック用エンドポイント
@@ -19,7 +19,7 @@ app.get('/run', async (req, res) => {
   }
 });
 
-// ★あとで消す：ベンチマーク専用エンドポイント ※CRON ジョブから叩く★
+/* ★あとで消す：ベンチマーク専用エンドポイント ※CRON ジョブから叩く★
 app.get('/benchmark', async (req, res) => {
   try {
     const result = await runBenchmark();
@@ -30,6 +30,7 @@ app.get('/benchmark', async (req, res) => {
   }
 });
 // ★ここまで消す★
+*/
 
 const port = process.env.PORT || 10000;
 app.listen(port, () => {
