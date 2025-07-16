@@ -53,12 +53,10 @@ const TARGET_DAY_RAW   = DAY_FILTER_RAW;
 
 // ===== 月訪問ロジック =====
 async function visitMonth(page, includeDateFilter) {
-  // reCAPTCHA 検知（challenge が来たら中断）
   const anchor    = await page.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout:1000 }).catch(() => null);
   const challenge = await page.waitForSelector('iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect', { timeout:1000 }).catch(() => null);
   if (challenge && !anchor) return [];
 
-  // ○アイコンのある日リンクを取得
   const available = await page.evaluate(() => {
     return Array.from(document.querySelectorAll('a'))
       .filter(a => a.querySelector('img[src*="icon_circle.png"]'))
@@ -70,13 +68,12 @@ async function visitMonth(page, includeDateFilter) {
     const byDate = includeDateFilter && DATE_FILTER_LIST.some(d => label.includes(d));
     const byDay  = !DATE_FILTER_LIST.length && DAY_FILTER && label.includes(TARGET_DAY_RAW);
     if (byDate || byDay) {
-      // ページ遷移＋カレンダー描画完了まで最大120秒待機
       await Promise.all([
         page.goto(href, { waitUntil: 'networkidle2', timeout: 120000 }),
-        page.waitForSelector('#calendarContent', { timeout: 120000 }).catch(() => console.warn('⚠️ #calendarContent タイムアウト'))
+        page.waitForSelector('#calendarContent', { timeout: 120000 })
+          .catch(() => console.warn('⚠️ #calendarContent タイムアウト'))
       ]);
 
-      // 詳細ページでの reCAPTCHA 検知
       const ia = await page.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout:1000 }).catch(() => null);
       const ii = await page.waitForSelector('iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect', { timeout:1000 }).catch(() => null);
       if (ii && !ia) {
@@ -84,7 +81,6 @@ async function visitMonth(page, includeDateFilter) {
         continue;
       }
 
-      // 施設名チェック
       const found = await page.evaluate(name =>
         Array.from(document.querySelectorAll('a')).some(a => a.textContent.includes(name)),
         TARGET_FACILITY_NAME
