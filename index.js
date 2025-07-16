@@ -1,7 +1,7 @@
 const puppeteer = require('puppeteer');
 const axios     = require('axios');
 
-// === 環境変数の取得（RenderのGUIで設定）==
+// === 環境変数の取得（RenderのGUIで設定）===
 const TARGET_URL           = process.env.TARGET_URL;
 const GAS_WEBHOOK_URL      = process.env.GAS_WEBHOOK_URL;
 const TARGET_FACILITY_NAME = process.env.TARGET_FACILITY_NAME || '';
@@ -39,6 +39,7 @@ const DAY_MAP = {
 
 const DATE_FILTER_LIST = normalizeDates(DATE_FILTER_RAW);
 const DAY_FILTER       = DAY_MAP[DAY_FILTER_RAW] || null;
+const TARGET_DAY_RAW   = DAY_FILTER_RAW;
 
 ;(async () => {
   let browser;
@@ -56,35 +57,33 @@ const DAY_FILTER       = DAY_MAP[DAY_FILTER_RAW] || null;
     await page.goto(TARGET_URL, { waitUntil: 'networkidle2', timeout: 60000 });
 
     // --- reCAPTCHA（画像認証）検知 ---
-    const anchorFrame    = await page.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]',       { timeout: 1000 }).catch(() => null);
-    const imageFrame     = await page.waitForSelector('iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect', { timeout: 1000 }).catch(() => null);
+    const anchorFrame = await page.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout: 1000 }).catch(() => null);
+    const imageFrame  = await page.waitForSelector('iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect', { timeout: 1000 }).catch(() => null);
     if (imageFrame && !anchorFrame) {
       console.warn('🔴 画像認証チャレンジ検知 → 即終了');
       return;
     }
     console.log('🟢 reCAPTCHA チェックボックスのみ or none → 続行');
 
-    // ○アイコンがあるリンクを〈a〉要素で取得（CSS :has() を利用）
-    const anchorHandles = await page.$$('a:has(img[src*="icon_circle.png"])');
-    const availableDates = [];
-    for (const aElem of anchorHandles) {
-      const href    = await (await aElem.getProperty('href')).jsonValue();
-      const text    = await (await aElem.getProperty('textContent')).jsonValue();
-      availableDates.push({ href, label: text.trim() });
-    }
+    // ○アイコンがあるリンクを取得
+    const availableDates = await page.$$eval('a:has(img[src*="icon_circle.png"])', anchors => {
+      return anchors.map(a => ({
+        href: a.href,
+        label: a.textContent.trim()
+      }));
+    });
 
     const matched = [];
     for (const { href, label } of availableDates) {
       const byDate = DATE_FILTER_LIST.length > 0
         ? DATE_FILTER_LIST.some(d => label.includes(d))
         : false;
-      const byDay  = DATE_FILTER_LIST.length === 0 && DAY_FILTER && label.includes(DAY_FILTER_RAW);
+      const byDay = DATE_FILTER_LIST.length === 0 && DAY_FILTER && label.includes(TARGET_DAY_RAW);
 
       if (byDate || byDay) {
         await page.goto(href, { waitUntil: 'networkidle2', timeout: 60000 });
 
-        // 詳細ページでの画像認証検知
-        const innerAnchor = await page.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]',       { timeout: 1000 }).catch(() => null);
+        const innerAnchor = await page.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout: 1000 }).catch(() => null);
         const innerImage  = await page.waitForSelector('iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect', { timeout: 1000 }).catch(() => null);
         if (innerImage && !innerAnchor) {
           console.warn('🔴 詳細ページで画像認証検知 → スキップ');
@@ -92,25 +91,18 @@ const DAY_FILTER       = DAY_MAP[DAY_FILTER_RAW] || null;
           continue;
         }
 
-        // 施設リンクの有無を ElementHandle.getProperty() だけでチェック
-        const linkHandles = await page.$$('a');
-        let found = false;
-        for (const link of linkHandles) {
-          const txt = await (await link.getProperty('textContent')).jsonValue();
-          if (txt.includes(TARGET_FACILITY_NAME)) {
-            found = true;
-            break;
-          }
-        }
+        const found = await page.$$eval('a', (anchors, facilityName) => {
+          return anchors.some(a => a.textContent.includes(facilityName));
+        }, TARGET_FACILITY_NAME);
+
         if (found) matched.push(label);
         await page.goBack({ waitUntil: 'networkidle2', timeout: 60000 });
       }
     }
 
-    // マッチがあれば Webhook 送信
     for (const hit of matched) {
       const message =
-        `✅ ${DAY_FILTER_RAW}：空きあり「${TARGET_FACILITY_NAME}」\n` +
+        `✅ ${TARGET_DAY_RAW}：空きあり「${TARGET_FACILITY_NAME}」\n` +
         `${hit}\n\n${TARGET_URL}`;
       await axios.post(GAS_WEBHOOK_URL, { message });
     }
