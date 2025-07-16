@@ -11,10 +11,10 @@ app.get('/health', (req, res) => {
 app.get('/run', async (req, res) => {
   try {
     await run();
-    res.send('実行完了');
+    res.send(204);
   } catch (err) {
-    console.error('Error in run():', err);
-    res.status(500).send('実行失敗: ' + err.message);
+    console.error(err);
+    res.status(500);
   }
 });
 
