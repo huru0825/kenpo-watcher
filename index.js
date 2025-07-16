@@ -1,3 +1,8 @@
+/***********************************************************************************
+* ターゲットURLはカレンダーに遷移するTOPページを指定のため、renderの環境変数は使っておらず，URLハードコード
+*　対象ページのリンクを変えたい場合は，INDEX_URL を変更する　
+***********************************************************************************/
+
 const puppeteer      = require('puppeteer-extra');
 const StealthPlugin  = require('puppeteer-extra-plugin-stealth');
 const axios          = require('axios');
@@ -59,10 +64,10 @@ async function visitMonth(page, includeDateFilter) {
     const byDate = includeDateFilter && DATE_FILTER_LIST.some(d => label.includes(d));
     const byDay  = !DATE_FILTER_LIST.length && DAY_FILTER && label.includes(TARGET_DAY_RAW);
     if (byDate || byDay) {
+      // ページ遷移＋カレンダー描画完了まで最大60秒待機 → 90秒待機に変更
       await Promise.all([
-        page.goto(href, { waitUntil:'networkidle2', timeout:60000 }),
-        // ページ遷移の代わりに、カレンダー読み込み完了を待つ
-        page.waitForSelector('#calendarContent', { timeout: 60000 }).catch(() => {})
+        page.goto(href, { waitUntil:'networkidle2', timeout:90000 }),
+        page.waitForSelector('#calendarContent', { timeout:90000 }).catch(() => {})
       ]);
 
       // 詳細ページでの reCAPTCHA 検知
@@ -98,9 +103,10 @@ async function clickPrev(page) {
 
 // ===== main =====
 module.exports.run = async function() {
+  const startTime = Date.now();                            // ← 開始時間記録
   let browser;
   try {
-    console.log('🔄 Launching browser...', CHROME_PATH);
+    console.log('🔄 ブラウザ 起動中...', CHROME_PATH);
     // 1) ステルス＆偽装起動
     browser = await puppeteer.launch({
       headless: true,
@@ -112,7 +118,7 @@ module.exports.run = async function() {
       ],
       env: { ...process.env, PUPPETEER_SKIP_DOWNLOAD:'true' }
     });
-    console.log('✅ Browser launched');
+    console.log('✅ ブラウザを起動');
 
     const page = await browser.newPage();
     // ヘッダー偽装
@@ -128,8 +134,7 @@ module.exports.run = async function() {
     console.log('→ Clicking into calendar entry');
     await Promise.all([
       page.click('a[href*="/calendar_apply"]'),
-      // フォーム遷移ではなく、DOM 出し替えを待つ
-      page.waitForSelector('#calendarContent', { timeout: 60000 })
+      page.waitForSelector('#calendarContent', { timeout:60000 })
     ]);
     console.log('→ Calendar page ready');
 
@@ -141,7 +146,7 @@ module.exports.run = async function() {
       await anchorFrame.click('.recaptcha-checkbox-border');
       await page.waitForTimeout(2000);
     }
-    console.log('🟢 reCAPTCHA passed or not present');
+    console.log('🟢 reCAPTCHA 通過または無し');
 
     // 4) 「次へ」フォーム送信
     console.log('→ Submitting "次へ"');
@@ -170,12 +175,10 @@ module.exports.run = async function() {
       for (const label of hits) {
         if (!notified.has(label)) {
           notified.add(label);
-          const msg =
-            `【${TARGET_FACILITY_NAME}】予約状況更新\n` +
-            `日付：${label}\n` +
-            `詳細はこちら▶︎ ${INDEX_URL}`;
           console.log('→ Notify:', label);
-          await axios.post(GAS_WEBHOOK_URL, { message: msg });
+          await axios.post(GAS_WEBHOOK_URL, { message:
+            `【${TARGET_FACILITY_NAME}】予約状況更新\n日付：${label}\n詳細はこちら▶︎ ${INDEX_URL}`
+          });
         }
       }
     }
@@ -188,9 +191,12 @@ module.exports.run = async function() {
       });
     }
 
+    const endTime = Date.now();                             // ← 終了時間記録
+    console.log(`⏱ Total elapsed time: ${(endTime - startTime)/1000}s`);
+
   } catch (err) {
     const text = err.stack||err.message||String(err);
-    console.error('⚠️ Exception caught:', text);
+    console.error('⚠️ 例外をキャッチ:', text);
     await axios.post(GAS_WEBHOOK_URL, { message: '⚠️ エラーが発生しました：\n'+text });
     process.exit(1);
   } finally {
