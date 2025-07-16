@@ -1,29 +1,42 @@
 # .github/workflows/build-and-publish.yml
 name: Build and Publish Binary
+
 on:
   push:
     branches: [ main ]
-    on:
-    workflow_dispatch:
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
       - name: Install dependencies
-        run: npm install
+        run: |
+          echo "🔧 Start: npm ci"
+          npm ci
+          echo "✅ End: npm ci"
 
       - name: Bundle with esbuild
-        run: npm run bundle  # dist/index.js を生成
+        run: |
+          echo "📦 Start: npm run bundle"
+          npm run bundle
+          echo "✅ End: npm run bundle"
 
       - name: Verify bundle output
-        run: test -f dist/index.js
+        run: |
+          echo "🕵️ Checking dist/index.js exists"
+          test -f dist/index.js
 
       - name: Build binary via pkg
-        run: npm run build-binary  # dist/index.js → kenpo-watcher
+        run: |
+          echo "🏗️ Start: npm run build-binary"
+          npm run build-binary
+          echo "✅ End: npm run build-binary"
 
       - name: Upload kenpo-watcher binary
         uses: actions/upload-artifact@v4
