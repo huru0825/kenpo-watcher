@@ -39,7 +39,8 @@ var DATE_FILTER_LIST = normalizeDates(DATE_FILTER_RAW);
 var DAY_FILTER       = DAY_MAP[DAY_FILTER_RAW] || null;
 var TARGET_DAY_RAW   = DAY_FILTER_RAW;
 
-;(async function() {
+// メイン処理を関数化
+module.exports.run = async function() {
   var browser;
   try {
     console.log('🔄 Launching browser...', CHROME_PATH);
@@ -55,8 +56,14 @@ var TARGET_DAY_RAW   = DAY_FILTER_RAW;
     await page.goto(TARGET_URL, { waitUntil: 'networkidle2', timeout: 60000 });
 
     // --- reCAPTCHA（画像認証）検知 ---
-    var anchorFrame = await page.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout: 1000 }).catch(function() { return null; });
-    var imageFrame  = await page.waitForSelector('iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect', { timeout: 1000 }).catch(function() { return null; });
+    var anchorFrame = await page.waitForSelector(
+      'iframe[src*="/recaptcha/api2/anchor"]',
+      { timeout: 1000 }
+    ).catch(function() { return null; });
+    var imageFrame  = await page.waitForSelector(
+      'iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect',
+      { timeout: 1000 }
+    ).catch(function() { return null; });
     if (imageFrame && !anchorFrame) {
       console.warn('🔴 画像認証チャレンジ検知 → 即終了');
       return;
@@ -69,7 +76,7 @@ var TARGET_DAY_RAW   = DAY_FILTER_RAW;
       var anchors = Array.prototype.slice.call(document.querySelectorAll('a'));
       for (var i = 0; i < anchors.length; i++) {
         var a = anchors[i];
-        if (a.querySelector('img[src*="icon_circle.png"]') !== null) {
+        if (a.querySelector('img[src*="icon_circle.png"]')) {
           arr.push({ href: a.href, label: a.textContent.trim() });
         }
       }
@@ -102,8 +109,14 @@ var TARGET_DAY_RAW   = DAY_FILTER_RAW;
         await page.goto(href, { waitUntil: 'networkidle2', timeout: 60000 });
 
         // 詳細ページでの reCAPTCHA 検知
-        var innerAnchor = await page.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout: 1000 }).catch(function() { return null; });
-        var innerImage  = await page.waitForSelector('iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect', { timeout: 1000 }).catch(function() { return null; });
+        var innerAnchor = await page.waitForSelector(
+          'iframe[src*="/recaptcha/api2/anchor"]',
+          { timeout: 1000 }
+        ).catch(function() { return null; });
+        var innerImage = await page.waitForSelector(
+          'iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect',
+          { timeout: 1000 }
+        ).catch(function() { return null; });
         if (innerImage && !innerAnchor) {
           console.warn('🔴 詳細ページで画像認証検知 → スキップ');
           await page.goBack({ waitUntil: 'networkidle2', timeout: 60000 });
@@ -121,9 +134,7 @@ var TARGET_DAY_RAW   = DAY_FILTER_RAW;
           return false;
         }, TARGET_FACILITY_NAME);
 
-        if (found) {
-          matched.push(label);
-        }
+        if (found) matched.push(label);
         await page.goBack({ waitUntil: 'networkidle2', timeout: 60000 });
       }
     }
@@ -144,4 +155,4 @@ var TARGET_DAY_RAW   = DAY_FILTER_RAW;
   } finally {
     if (browser) await browser.close();
   }
-})();
+};
