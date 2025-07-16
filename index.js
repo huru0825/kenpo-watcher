@@ -19,13 +19,11 @@ function normalizeDates(raw) {
   return raw
     .replace(/、/g, ',')
     .split(',')
-    .map(d => d.trim())
+    .map(function(d) { return d.trim(); })
     .filter(Boolean)
-    .map(date => {
+    .map(function(date) {
       const m = date.match(/^(\d{1,2})月(\d{1,2})日$/);
-      return m
-        ? `${m[1].padStart(2,'0')}月${m[2].padStart(2,'0')}日`
-        : null;
+      return m ? m[1].padStart(2, '0') + '月' + m[2].padStart(2, '0') + '日' : null;
     })
     .filter(Boolean);
 }
@@ -41,7 +39,7 @@ const DATE_FILTER_LIST = normalizeDates(DATE_FILTER_RAW);
 const DAY_FILTER       = DAY_MAP[DAY_FILTER_RAW] || null;
 const TARGET_DAY_RAW   = DAY_FILTER_RAW;
 
-;(async () => {
+;(async function() {
   let browser;
   try {
     console.log('🔄 Launching browser...', CHROME_PATH);
@@ -57,8 +55,8 @@ const TARGET_DAY_RAW   = DAY_FILTER_RAW;
     await page.goto(TARGET_URL, { waitUntil: 'networkidle2', timeout: 60000 });
 
     // --- reCAPTCHA（画像認証）検知 ---
-    const anchorFrame = await page.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout: 1000 }).catch(() => null);
-    const imageFrame  = await page.waitForSelector('iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect', { timeout: 1000 }).catch(() => null);
+    const anchorFrame = await page.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout: 1000 }).catch(function() { return null; });
+    const imageFrame  = await page.waitForSelector('iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect', { timeout: 1000 }).catch(function() { return null; });
     if (imageFrame && !anchorFrame) {
       console.warn('🔴 画像認証チャレンジ検知 → 即終了');
       return;
@@ -66,33 +64,40 @@ const TARGET_DAY_RAW   = DAY_FILTER_RAW;
     console.log('🟢 reCAPTCHA チェックボックスのみ or none → 続行');
 
     // ○アイコンがあるリンクを取得
-    const availableDates = await page.$$eval('a:has(img[src*="icon_circle.png"])', anchors => {
-      return anchors.map(a => ({
-        href: a.href,
-        label: a.textContent.trim()
-      }));
+    const availableDates = await page.$$eval('a:has(img[src*="icon_circle.png"])', function(anchors) {
+      return anchors.map(function(a) {
+        return {
+          href: a.href,
+          label: a.textContent.trim()
+        };
+      });
     });
 
     const matched = [];
-    for (const { href, label } of availableDates) {
+    for (let i = 0; i < availableDates.length; i++) {
+      const href  = availableDates[i].href;
+      const label = availableDates[i].label;
+
       const byDate = DATE_FILTER_LIST.length > 0
-        ? DATE_FILTER_LIST.some(d => label.includes(d))
+        ? DATE_FILTER_LIST.some(function(d) { return label.includes(d); })
         : false;
       const byDay = DATE_FILTER_LIST.length === 0 && DAY_FILTER && label.includes(TARGET_DAY_RAW);
 
       if (byDate || byDay) {
         await page.goto(href, { waitUntil: 'networkidle2', timeout: 60000 });
 
-        const innerAnchor = await page.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout: 1000 }).catch(() => null);
-        const innerImage  = await page.waitForSelector('iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect', { timeout: 1000 }).catch(() => null);
+        const innerAnchor = await page.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout: 1000 }).catch(function() { return null; });
+        const innerImage  = await page.waitForSelector('iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect', { timeout: 1000 }).catch(function() { return null; });
         if (innerImage && !innerAnchor) {
           console.warn('🔴 詳細ページで画像認証検知 → スキップ');
           await page.goBack({ waitUntil: 'networkidle2', timeout: 60000 });
           continue;
         }
 
-        const found = await page.$$eval('a', (anchors, facilityName) => {
-          return anchors.some(a => a.textContent.includes(facilityName));
+        const found = await page.$$eval('a', function(anchors, facilityName) {
+          return anchors.some(function(a) {
+            return a.textContent.includes(facilityName);
+          });
         }, TARGET_FACILITY_NAME);
 
         if (found) matched.push(label);
@@ -100,17 +105,16 @@ const TARGET_DAY_RAW   = DAY_FILTER_RAW;
       }
     }
 
-    for (const hit of matched) {
-      const message =
-        `✅ ${TARGET_DAY_RAW}：空きあり「${TARGET_FACILITY_NAME}」\n` +
-        `${hit}\n\n${TARGET_URL}`;
-      await axios.post(GAS_WEBHOOK_URL, { message });
+    for (let i = 0; i < matched.length; i++) {
+      const hit = matched[i];
+      const message = '✅ ' + TARGET_DAY_RAW + '：空きあり「' + TARGET_FACILITY_NAME + '」\n' + hit + '\n\n' + TARGET_URL;
+      await axios.post(GAS_WEBHOOK_URL, { message: message });
     }
 
   } catch (err) {
     console.error('❌ Exception caught:', err);
     const text = err.stack || err.message || String(err);
-    await axios.post(GAS_WEBHOOK_URL, { message: `⚠️ Error occurred:\n${text}` });
+    await axios.post(GAS_WEBHOOK_URL, { message: '⚠️ Error occurred:\n' + text });
     process.exit(1);
   } finally {
     if (browser) await browser.close();
