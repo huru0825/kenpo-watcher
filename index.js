@@ -30,15 +30,11 @@ function normalizeDates(raw) {
     .filter(Boolean);
 }
 
-// === 日本語→英語曜日マップ ===
+// === 日本語→英語曜マップ ===
 const DAY_MAP = {
-  '日曜日': 'Sunday',
-  '月曜日': 'Monday',
-  '火曜日': 'Tuesday',
-  '水曜日': 'Wednesday',
-  '木曜日': 'Thursday',
-  '金曜日': 'Friday',
-  '土曜日': 'Saturday'
+  '日曜日': 'Sunday','月曜日': 'Monday','火曜日': 'Tuesday',
+  '水曜日': 'Wednesday','木曜日': 'Thursday',
+  '金曜日': 'Friday','土曜日': 'Saturday'
 };
 
 const DATE_FILTER_LIST = normalizeDates(DATE_FILTER_RAW);
@@ -60,55 +56,53 @@ const DAY_FILTER       = DAY_MAP[DAY_FILTER_RAW] || null;
     await page.goto(TARGET_URL, { waitUntil: 'networkidle2', timeout: 60000 });
 
     // --- reCAPTCHA（画像認証）検知 ---
-    const hasAnchor         = await page.$('iframe[src*="/recaptcha/api2/anchor"]');
-    const hasImageChallenge = await page.$('iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect');
-    if (hasImageChallenge && !hasAnchor) {
+    const anchorFrame    = await page.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]',       { timeout: 1000 }).catch(() => null);
+    const imageFrame     = await page.waitForSelector('iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect', { timeout: 1000 }).catch(() => null);
+    if (imageFrame && !anchorFrame) {
       console.warn('🔴 画像認証チャレンジ検知 → 即終了');
       return;
     }
     console.log('🟢 reCAPTCHA チェックボックスのみ or none → 続行');
 
-    // ○○アイコンがあるリンクを抽出
-    const availableDates = await page.$$eval(
-      'img[src*="icon_circle.png"]',
-      (imgs) => imgs.map(img => {
-        const a = img.closest('a');
-        return a && a.href
-          ? { href: a.href, label: a.textContent.trim() }
-          : null;
-      }).filter(Boolean)
-    );
+    // ○アイコンがあるリンクを〈a〉要素で取得（CSS :has() を利用）
+    const anchorHandles = await page.$$('a:has(img[src*="icon_circle.png"])');
+    const availableDates = [];
+    for (const aElem of anchorHandles) {
+      const href    = await (await aElem.getProperty('href')).jsonValue();
+      const text    = await (await aElem.getProperty('textContent')).jsonValue();
+      availableDates.push({ href, label: text.trim() });
+    }
 
     const matched = [];
-
     for (const { href, label } of availableDates) {
-      const byDate = DATE_FILTER_LIST.some(d => label.includes(d));
-      const byDay  = DAY_FILTER && label.includes(DAY_FILTER_RAW);
+      const byDate = DATE_FILTER_LIST.length > 0
+        ? DATE_FILTER_LIST.some(d => label.includes(d))
+        : false;
+      const byDay  = DATE_FILTER_LIST.length === 0 && DAY_FILTER && label.includes(DAY_FILTER_RAW);
 
-      if ((DATE_FILTER_LIST.length > 0 && byDate) ||
-          (DATE_FILTER_LIST.length === 0 && byDay)) {
-
+      if (byDate || byDay) {
         await page.goto(href, { waitUntil: 'networkidle2', timeout: 60000 });
 
         // 詳細ページでの画像認証検知
-        const innerAnchor = await page.$('iframe[src*="/recaptcha/api2/anchor"]');
-        const innerImage  = await page.$('iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect');
+        const innerAnchor = await page.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]',       { timeout: 1000 }).catch(() => null);
+        const innerImage  = await page.waitForSelector('iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect', { timeout: 1000 }).catch(() => null);
         if (innerImage && !innerAnchor) {
           console.warn('🔴 詳細ページで画像認証検知 → スキップ');
           await page.goBack({ waitUntil: 'networkidle2', timeout: 60000 });
           continue;
         }
 
-        // 施設リンクの有無をチェック
-        const facilityFound = await page.$$eval(
-          'a',
-          (links, name) => links.some(a => a.textContent.includes(name)),
-          TARGET_FACILITY_NAME
-        );
-
-        if (facilityFound) {
-          matched.push(label);
+        // 施設リンクの有無を ElementHandle.getProperty() だけでチェック
+        const linkHandles = await page.$$('a');
+        let found = false;
+        for (const link of linkHandles) {
+          const txt = await (await link.getProperty('textContent')).jsonValue();
+          if (txt.includes(TARGET_FACILITY_NAME)) {
+            found = true;
+            break;
+          }
         }
+        if (found) matched.push(label);
         await page.goBack({ waitUntil: 'networkidle2', timeout: 60000 });
       }
     }
