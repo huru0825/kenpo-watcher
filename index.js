@@ -1,7 +1,7 @@
 /***********************************************************************************
-* ターゲットURLはカレンダーに遷移するTOPページを指定のため、renderの環境変数は使っておらず，URLハードコード
-*　対象ページのリンクを変えたい場合は，INDEX_URL を変更する　
-***********************************************************************************/
+ * ターゲットURLはカレンダーに遷移するTOPページを指定のためハードコード。
+ * 対象ページのリンクを変えたい場合は INDEX_URL を変更してください。
+ ***********************************************************************************/
 
 const puppeteer      = require('puppeteer-extra');
 const StealthPlugin  = require('puppeteer-extra-plugin-stealth');
@@ -48,8 +48,8 @@ const TARGET_DAY_RAW   = DAY_FILTER_RAW;
 // ===== 月訪問ロジック =====
 async function visitMonth(page, includeDateFilter) {
   // reCAPTCHA 検知（challenge が来たら中断）
-  const anchor    = await page.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout:1000 }).catch(()=>null);
-  const challenge = await page.waitForSelector('iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect', { timeout:1000 }).catch(()=>null);
+  const anchor    = await page.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout:1000 }).catch(() => null);
+  const challenge = await page.waitForSelector('iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect', { timeout:1000 }).catch(() => null);
   if (challenge && !anchor) return [];
 
   // ○アイコンのある日リンクを取得
@@ -64,15 +64,15 @@ async function visitMonth(page, includeDateFilter) {
     const byDate = includeDateFilter && DATE_FILTER_LIST.some(d => label.includes(d));
     const byDay  = !DATE_FILTER_LIST.length && DAY_FILTER && label.includes(TARGET_DAY_RAW);
     if (byDate || byDay) {
-      // ページ遷移＋カレンダー描画完了まで最大60秒待機 → 90秒待機に変更
+      // ページ遷移＋カレンダー描画完了まで最大90秒待機
       await Promise.all([
-        page.goto(href, { waitUntil:'networkidle2', timeout:90000 }),
-        page.waitForSelector('#calendarContent', { timeout:90000 }).catch(() => {})
+        page.goto(href, { waitUntil:'networkidle2', timeout:90000 }),                              // ← timeout 90秒に変更
+        page.waitForSelector('#calendarContent', { timeout:90000 }).catch(() => {})               // ← timeout 90秒に変更
       ]);
 
       // 詳細ページでの reCAPTCHA 検知
-      const ia = await page.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout:1000 }).catch(()=>null);
-      const ii = await page.waitForSelector('iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect', { timeout:1000 }).catch(()=>null);
+      const ia = await page.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout:1000 }).catch(() => null);
+      const ii = await page.waitForSelector('iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect', { timeout:1000 }).catch(() => null);
       if (ii && !ia) {
         await page.goBack({ waitUntil:'networkidle2' }).catch(() => {});
         continue;
@@ -93,7 +93,7 @@ async function visitMonth(page, includeDateFilter) {
 // ===== navigation helpers =====
 async function clickNext(page) {
   await page.click('input[id=nextMonth]');
-  // AJAX 完了でカレンダー更新
+  // AJAX 完了でカレンダー更新を待機
   await page.waitForResponse(r => r.url().includes('/calendar_apply/calendar_select'));
 }
 async function clickPrev(page) {
@@ -103,7 +103,6 @@ async function clickPrev(page) {
 
 // ===== main =====
 module.exports.run = async function() {
-  const startTime = Date.now();                            // ← 開始時間記録
   let browser;
   try {
     console.log('🔄 ブラウザ 起動中...', CHROME_PATH);
@@ -134,7 +133,7 @@ module.exports.run = async function() {
     console.log('→ Clicking into calendar entry');
     await Promise.all([
       page.click('a[href*="/calendar_apply"]'),
-      page.waitForSelector('#calendarContent', { timeout:60000 })
+      page.waitForSelector('#calendarContent', { timeout:90000 })   // ← timeout 90秒に変更
     ]);
     console.log('→ Calendar page ready');
 
@@ -191,13 +190,10 @@ module.exports.run = async function() {
       });
     }
 
-    const endTime = Date.now();                             // ← 終了時間記録
-    console.log(`⏱ Total elapsed time: ${(endTime - startTime)/1000}s`);
-
   } catch (err) {
-    const text = err.stack||err.message||String(err);
+    const text = err.stack || err.message || String(err);
     console.error('⚠️ 例外をキャッチ:', text);
-    await axios.post(GAS_WEBHOOK_URL, { message: '⚠️ エラーが発生しました：\n'+text });
+    await axios.post(GAS_WEBHOOK_URL, { message: '⚠️ エラーが発生しました：\n' + text });
     process.exit(1);
   } finally {
     if (browser) {
