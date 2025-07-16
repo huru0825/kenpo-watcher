@@ -69,12 +69,14 @@ async function visitMonth(page, includeDateFilter) {
     const byDate = includeDateFilter && DATE_FILTER_LIST.some(d => label.includes(d));
     const byDay  = !DATE_FILTER_LIST.length && DAY_FILTER && label.includes(TARGET_DAY_RAW);
     if (byDate || byDay) {
-      // 【変更】timeout を無制限(0)にして実測用
-      await Promise.all([
-        page.goto(href,           { waitUntil: 'networkidle2', timeout: 0 }),
-        page.waitForSelector('#calendarContent', { timeout: 0 })
-          .catch(() => console.warn('⚠️ #calendarContent タイムアウト'))
-      ]);
+      // カレンダー詳細ページに遷移
+      await page.goto(href,           { waitUntil: 'networkidle2', timeout: 0 });
+
+      // 【ここを修正】カレンダーのセルが１つ以上描画されるまで待つ（最大120秒）
+      await page.waitForFunction(
+        () => document.querySelectorAll('.tb-calendar tbody td').length > 0,
+        { timeout: 120_000 }
+      );
 
       // 詳細ページでの reCAPTCHA 検知
       const ia = await page.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout:1000 }).catch(() => null);
@@ -143,8 +145,8 @@ module.exports.run = async function() {
     console.log('→ Clicking into calendar entry');
     await Promise.all([
       page.click('a[href*="/calendar_apply"]'),
-      page.waitForSelector('#calendarContent', { timeout: 0 })
-        .catch(() => console.warn('⚠️ #calendarContent タイムアウト'))
+      // カレンダー画面待機も無制限（実測用）
+      page.waitForSelector('#calendarContent', { timeout: 0 }).catch(() => {})
     ]);
 
     // 2) reCAPTCHA チェック
@@ -163,7 +165,6 @@ module.exports.run = async function() {
       page.click('input.button-select.button-primary[value="次へ"]'),
       page.waitForResponse(r => r.url().includes('/calendar_apply/calendar_select'))
     ]);
-    console.log('→ Moved to calendar view');
 
     // 4) 月巡回シーケンス
     const sequence = [
