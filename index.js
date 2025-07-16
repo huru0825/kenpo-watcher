@@ -53,27 +53,30 @@ const TARGET_DAY_RAW   = DAY_FILTER_RAW;
 
 // ===== 月訪問ロジック =====
 async function visitMonth(page, includeDateFilter) {
+  // reCAPTCHA 検知（challenge が来たら中断）
   const anchor    = await page.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout:1000 }).catch(() => null);
   const challenge = await page.waitForSelector('iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect', { timeout:1000 }).catch(() => null);
   if (challenge && !anchor) return [];
 
-  const available = await page.evaluate(() => {
-    return Array.from(document.querySelectorAll('a'))
-      .filter(a => a.querySelector('img[src*="icon_circle.png"]'))
-      .map(a => ({ href: a.href, label: a.textContent.trim() }));
-  });
+  // ○アイコンのある日リンクを取得
+  const available = await page.evaluate(() => Array.from(document.querySelectorAll('a'))
+    .filter(a => a.querySelector('img[src*="icon_circle.png"]'))
+    .map(a => ({ href: a.href, label: a.textContent.trim() }))
+  );
 
   const hits = [];
   for (const { href, label } of available) {
     const byDate = includeDateFilter && DATE_FILTER_LIST.some(d => label.includes(d));
     const byDay  = !DATE_FILTER_LIST.length && DAY_FILTER && label.includes(TARGET_DAY_RAW);
     if (byDate || byDay) {
+      // 【変更】timeout を無制限(0)にして実測用
       await Promise.all([
-        page.goto(href, { waitUntil: 'networkidle2', timeout: 120000 }),
-        page.waitForSelector('#calendarContent', { timeout: 120000 })
+        page.goto(href,           { waitUntil: 'networkidle2', timeout: 0 }),
+        page.waitForSelector('#calendarContent', { timeout: 0 })
           .catch(() => console.warn('⚠️ #calendarContent タイムアウト'))
       ]);
 
+      // 詳細ページでの reCAPTCHA 検知
       const ia = await page.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout:1000 }).catch(() => null);
       const ii = await page.waitForSelector('iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect', { timeout:1000 }).catch(() => null);
       if (ii && !ia) {
@@ -81,6 +84,7 @@ async function visitMonth(page, includeDateFilter) {
         continue;
       }
 
+      // 施設名チェック
       const found = await page.evaluate(name =>
         Array.from(document.querySelectorAll('a')).some(a => a.textContent.includes(name)),
         TARGET_FACILITY_NAME
@@ -122,7 +126,7 @@ module.exports.run = async function() {
         '--disable-setuid-sandbox',
         '--disable-blink-features=AutomationControlled'
       ],
-      env: { ...process.env, PUPPETEER_SKIP_DOWNLOAD: 'true' }
+      env: { ...process.env, PUPPETEER_SKIP_DOWNLOAD:'true' }
     });
     console.log('✅ ブラウザを起動');
 
@@ -133,18 +137,17 @@ module.exports.run = async function() {
       'Chrome/115.0.0.0 Safari/537.36'
     );
 
-    // 2) インデックス→カレンダー入口
+    // 1) INDEX → カレンダー入口
     console.log('→ Navigating to INDEX page');
-    await page.goto(INDEX_URL, { waitUntil: 'networkidle2' });
+    await page.goto(INDEX_URL, { waitUntil: 'networkidle2', timeout: 0 });
     console.log('→ Clicking into calendar entry');
     await Promise.all([
       page.click('a[href*="/calendar_apply"]'),
-      page.waitForSelector('#calendarContent', { timeout: 120000 })
+      page.waitForSelector('#calendarContent', { timeout: 0 })
         .catch(() => console.warn('⚠️ #calendarContent タイムアウト'))
     ]);
-    console.log('→ Calendar page ready');
 
-    // 3) reCAPTCHA チェック
+    // 2) reCAPTCHA チェック
     const frames = page.frames();
     const anchorFrame = frames.find(f => f.url().includes('/recaptcha/api2/anchor'));
     if (anchorFrame) {
@@ -154,16 +157,15 @@ module.exports.run = async function() {
     }
     console.log('🟢 reCAPTCHA 通過または無し');
 
-    // 4) 「次へ」フォーム送信
+    // 3) 「次へ」送信
     console.log('→ Submitting "次へ"');
     await Promise.all([
       page.click('input.button-select.button-primary[value="次へ"]'),
-      page.waitForResponse(r => r.url().includes('/calendar_apply/calendar_select')),
-      page.waitForTimeout(2000)
+      page.waitForResponse(r => r.url().includes('/calendar_apply/calendar_select'))
     ]);
     console.log('→ Moved to calendar view');
 
-    // 5) 月巡回シーケンス
+    // 4) 月巡回シーケンス
     const sequence = [
       { action: null,      includeDate: true  },
       { action: clickNext, includeDate: false },
@@ -190,7 +192,7 @@ module.exports.run = async function() {
       }
     }
 
-    // 6) ヒットなしテスト通知
+    // 5) ヒットなし通知
     if (notified.size === 0) {
       console.log('→ No hits found, sending empty notification');
       await axios.post(GAS_WEBHOOK_URL, {
@@ -201,7 +203,7 @@ module.exports.run = async function() {
   } catch (err) {
     console.error('⚠️ 例外をキャッチ:', err);
     await axios.post(GAS_WEBHOOK_URL, {
-      message: '⚠️ エラーが発生しました：\n' + (err.stack || err.message)
+      message: '⚠️ エラーが発生しました：\n' + (err.stack||err.message)
     });
   } finally {
     if (browser) {
