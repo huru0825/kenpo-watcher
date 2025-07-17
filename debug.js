@@ -44,25 +44,53 @@ puppeteer.use(StealthPlugin());
     height: 700 + Math.floor(Math.random() * 300),
     deviceScaleFactor: 1
   });
-
   const UA = randomUseragent.getRandom() || 'Mozilla/5.0 (Windows NT 10; Win64; x64)';
   await page.setUserAgent(UA);
   await page.setExtraHTTPHeaders({ 'Accept-Language': 'ja-JP,ja;q=0.9' });
 
   const cookies = [
-    { name: 'AWSALBTG', value: 'ctQMEO7YmBC+s4w2fqp+KFye7Ko4mh4bofSlw9SqaUq+gUTe5Nu6Ek9cWPVrZnFSz0snKWl9PRPtK+6fpH+4BUp1vi4+ffihoOMPOLUiEpho0HS8y1ySac7Vm6338lNLVJ+OHODTsT8mX/oftXe/O1ufueSzl16tFaJRv355wobiQdU9rWc=', domain: 'as.its-kenpo.or.jp', path: '/', secure: false, httpOnly: false },
+    { name: 'AWSALBTG', value: 'SzOE9jw352s6uxWUBodYEL6pNxbuIAFSKEbH91LEHdiLCgdlrtkQJcbtIE/c1j/UKqtrOwOzC6eYES3bTfxNMKse0rFAi/3NGaFEfDSNHoOXlnM84FGauet80Db65s61hlOFTwJmrGedyB+NjiL1126VouHYgkHlPemq6+DEJeehC0pW5EU=', domain: 'as.its-kenpo.or.jp', path: '/', secure: false, httpOnly: false },
     { name: '_ga', value: 'GA1.1.581626692.1752773516', domain: '.its-kenpo.or.jp', path: '/', secure: false, httpOnly: false },
     { name: '_src_session', value: 'bea2f3a9e75dd7edff404854b3679dbc', domain: 'as.its-kenpo.or.jp', path: '/', secure: true, httpOnly: true },
-    { name: '_ga_YHTH3JM9GY', value: 'GS2.1.s1752773516$o1$g1$t1752776159$j60$l0$h0', domain: '.its-kenpo.or.jp', path: '/', secure: false, httpOnly: false },
-    { name: '_ga_R7KBSKLL21', value: 'GS2.1.s1752773516$o1$g1$t1752776159$j60$l0$h0', domain: '.its-kenpo.or.jp', path: '/', secure: false, httpOnly: false },
-    { name: 'AWSALB', value: 'e2oUrCfe6HmE5ojHqVJW9kqJuAvj68xlIaNsF9ioVSaZ8v8AsgyLnMteucNiKNjNq4Reeh0iaNLmkoynNfU0x0z++KhAWlOKEVvLYt1nG7ffdsjuL1OHq59zVwis', domain: 'as.its-kenpo.or.jp', path: '/', secure: false, httpOnly: false },
-    { name: 'AWSALBCORS', value: 'e2oUrCfe6HmE5ojHqVJW9kqJuAvj68xlIaNsF9ioVSaZ8v8AsgyLnMteucNiKNjNq4Reeh0iaNLmkoynNfU0x0z++KhAWlOKEVvLYt1nG7ffdsjuL1OHq59zVwis', domain: 'as.its-kenpo.or.jp', path: '/', secure: true, httpOnly: false },
-    { name: 'AWSALBTGCORS', value: 'ctQMEO7YmBC+s4w2fqp+KFye7Ko4mh4bofSlw9SqaUq+gUTe5Nu6Ek9cWPVrZnFSz0snKWl9PRPtK+6fpH+4BUp1vi4+ffihoOMPOLUiEpho0HS8y1ySac7Vm6338lNLVJ+OHODTsT8mX/oftXe/O1ufueSzl16tFaJRv355wobiQdU9rWc=', domain: 'as.its-kenpo.or.jp', path: '/', secure: true, httpOnly: false }
+    { name: '_ga_YHTH3JM9GY', value: 'GS2.1.s1752773516$o1$g1$t1752776845$j60$l0$h0', domain: '.its-kenpo.or.jp', path: '/', secure: false, httpOnly: false },
+    { name: '_ga_R7KBSKLL21', value: 'GS2.1.s1752773516$o1$g1$t1752776856$j49$l0$h0', domain: '.its-kenpo.or.jp', path: '/', secure: false, httpOnly: false },
+    { name: 'AWSALB', value: 'QgetHs0jtOE1LjZxlr5uc71lDX7rQ7E7onED1evqaelv2BCzDCcLM0xJr9I6lABs/ztj0yBi/LUAaTQ1Q0AnHLtrZGNKCetkrSXcDgzKX7w16upHVMjvzAdnVcp/', domain: 'as.its-kenpo.or.jp', path: '/', secure: false, httpOnly: false },
+    { name: 'AWSALBCORS', value: 'QgetHs0jtOE1LjZxlr5uc71lDX7rQ7E7onED1evqaelv2BCzDCcLM0xJr9I6lABs/ztj0yBi/LUAaTQ1Q0AnHLtrZGNKCetkrSXcDgzKX7w16upHVMjvzAdnVcp/', domain: 'as.its-kenpo.or.jp', path: '/', secure: true, httpOnly: false },
+    { name: 'AWSALBTGCORS', value: 'SzOE9jw352s6uxWUBodYEL6pNxbuIAFSKEbH91LEHdiLCgdlrtkQJcbtIE/c1j/UKqtrOwOzC6eYES3bTfxNMKse0rFAi/3NGaFEfDSNHoOXlnM84FGauet80Db65s61hlOFTwJmrGedyB+NjiL1126VouHYgkHlPemq6+DEJeehC0pW5EU=', domain: 'as.its-kenpo.or.jp', path: '/', secure: true, httpOnly: false }
   ];
   await page.setCookie(...cookies);
+
+  page.on('console', msg => console.log('PAGE ▶', msg.type(), msg.text()));
+  page.on('pageerror', err => console.error('PAGE ERROR ▶', err));
+  page.on('requestfailed', req => console.warn('REQUEST FAILED ▶', req.url(), req.failure()));
+  page.on('response', async res => {
+    if (res.url().includes('calendar_apply')) {
+      console.log(`XHR ▶ [${res.status()}] ${res.url()}`);
+      try {
+        const text = await res.text();
+        console.log('  body snippet:', text.slice(0, 200).replace(/\n/g, ' '), '…');
+      } catch {}
+    }
+  });
 
   console.log('🔄 INDEXページへ移動');
   await page.goto(INDEX_URL, { waitUntil: 'networkidle2', timeout: 0 });
 
-  console.log('→ 以下省略（CAPTCHAチェックやカレンダー遷移処理）');
+  console.log('🧠 CAPTCHAチェック開始');
+  const hasCaptcha = await page.$('iframe[src*="recaptcha"]');
+  if (hasCaptcha) {
+    console.warn('⚠️ CAPTCHAが検出されました');
+  } else {
+    console.log('✅ CAPTCHAは表示されていません（Cookie回避成功の可能性）');
+  }
+
+  // カレンダー表示リンクが存在するかチェック（画面遷移確認）
+  const calendarLink = await page.$('a[href*="calendar"]');
+  if (calendarLink) {
+    console.log('📅 カレンダーへのリンクが見つかりました');
+  } else {
+    console.warn('❌ カレンダーへのリンクが見つかりませんでした（失敗の可能性）');
+  }
+
+  await browser.close();
 })();
