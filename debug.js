@@ -1,5 +1,6 @@
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+const randomUseragent = require('random-useragent');
 
 puppeteer.use(StealthPlugin());
 
@@ -23,6 +24,24 @@ puppeteer.use(StealthPlugin());
   });
 
   const page = await browser.newPage();
+
+  // ランダムなViewportとUser-Agent設定
+  await page.setViewport({
+    width: 1200 + Math.floor(Math.random() * 300),
+    height: 700 + Math.floor(Math.random() * 300),
+    deviceScaleFactor: 1
+  });
+  const UA = randomUseragent.getRandom() || 'Mozilla/5.0 (Windows NT 10; Win64; x64)';
+  await page.setUserAgent(UA);
+  await page.setExtraHTTPHeaders({ 'Accept-Language': 'ja-JP,ja;q=0.9' });
+
+  // リソース制限（画像・CSS・フォントの読み込みを停止）
+  await page.setRequestInterception(true);
+  page.on('request', req => {
+    const type = req.resourceType();
+    if (['image', 'stylesheet', 'font'].includes(type)) req.abort();
+    else req.continue();
+  });
 
   page.on('console', msg => console.log('PAGE ▶', msg.type(), msg.text()));
   page.on('pageerror', err => console.error('PAGE ERROR ▶', err));
@@ -64,6 +83,7 @@ puppeteer.use(StealthPlugin());
     process.exit(1);
   }
 
+  // CAPTCHAチェック：最大3回クリック＋確認
   let passed = false;
   for (let i = 0; i < 3; i++) {
     console.log(`→ checkbox をクリック（${i + 1}回目）`);
@@ -76,9 +96,9 @@ puppeteer.use(StealthPlugin());
     });
     if (passed) break;
   }
-
   console.log('✅ CAPTCHA通過確認:', passed);
 
+  // 画像チャレンジまたはフォールバック iframe 検出
   const hasChallenge = !!page.frames().find(f =>
     f.url().includes('/bframe') || f.url().includes('/fallback')
   );
