@@ -3,9 +3,9 @@
  * 対象ページのリンクを変えたい場合は INDEX_URL を変更してください。
  ***********************************************************************************/
 
-const puppeteer      = require('puppeteer-extra');
-const StealthPlugin  = require('puppeteer-extra-plugin-stealth');
-const axios          = require('axios');
+const puppeteer     = require('puppeteer-extra');
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+const axios         = require('axios');
 
 puppeteer.use(StealthPlugin());
 
@@ -62,11 +62,16 @@ module.exports.warmup = async function() {
   await browser.close();
 };
 
-// ===== 共通：カレンダー領域描画待機 =====
+// ===== 共通：カレンダー領域描画待機 & XHR待機 =====
 async function waitCalendar(page) {
   console.log('→ カレンダー領域の検出待機…');
   await page.waitForSelector('#calendarContent table.tb-calendar', { timeout: 120_000 });
   console.log('→ カレンダー領域検出完了');
+  console.log('→ カレンダー取得XHR待機…');
+  await page.waitForResponse(r =>
+    r.url().includes('/calendar_apply/calendar_select') && r.status() === 200
+  );
+  console.log('→ カレンダーデータ取得完了');
 }
 
 // ===== 月訪問ロジック =====
@@ -98,7 +103,7 @@ async function visitMonth(page, includeDateFilter) {
       );
       console.log('→ [visitMonth] カレンダーセル検出');
 
-      // 詳細ページで reCAPTCHA が新たに出たらスキップ
+      // 詳細ページで reCAPTCHA が出ていればスキップ
       const ia = await page.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout:1000 }).catch(() => null);
       const ii = await page.waitForSelector('iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect', { timeout:1000 }).catch(() => null);
       if (ii && !ia) {
@@ -129,21 +134,14 @@ async function submitNext(page) {
   console.log('→ [submitNext] 「次へ」クリック');
   await page.click('input.button-select.button-primary[value="次へ"]');
   await waitCalendar(page);
-  console.log('→ [submitNext] カレンダー取得XHR待機…');
-  await page.waitForResponse(r =>
-    r.url().includes('/calendar_apply/calendar_select') && r.status() === 200
-  );
-  console.log('→ [submitNext] カレンダーデータ取得完了');
 }
 
-// カレンダー画面→翌月移動
+// カレンダー画面→翌月／前月移動
 async function nextMonth(page) {
   console.log('→ [nextMonth] 「翌月」クリック');
   await page.click('input.button-select.button-primary[value="次へ"]');
   await waitCalendar(page);
 }
-
-// カレンダー画面→前月移動
 async function prevMonth(page) {
   console.log('→ [prevMonth] 「前へ」クリック');
   await page.click('input.button-select.button-primary[value="前へ"]');
@@ -182,8 +180,7 @@ module.exports.run = async function() {
     console.log('→ [main] カレンダー入口クリック');
     await Promise.all([
       page.click('a[href*="/calendar_apply"]'),
-      page.waitForSelector('#calendarContent', { timeout: 0 })
-        .catch(() => console.warn('⚠️ [main] #calendarContent 未検出'))
+      page.waitForSelector('#calendarContent', { timeout: 0 }).catch(() => console.warn('⚠️ [main] #calendarContent 未検出'))
     ]);
     console.log('→ [main] カレンダー入口表示完了');
 
@@ -203,11 +200,11 @@ module.exports.run = async function() {
 
     // 4) 月巡回シーケンス
     const sequence = [
-      { action: null,      includeDate: true  },
-      { action: nextMonth, includeDate: false },
-      { action: nextMonth, includeDate: false },
-      { action: prevMonth, includeDate: false },
-      { action: prevMonth, includeDate: true  }
+      { action: null,       includeDate: true  },
+      { action: nextMonth,  includeDate: false },
+      { action: nextMonth,  includeDate: false },
+      { action: prevMonth,  includeDate: false },
+      { action: prevMonth,  includeDate: true  }
     ];
     const notified = new Set();
 
