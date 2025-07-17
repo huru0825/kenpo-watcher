@@ -69,19 +69,23 @@ async function visitMonth(page, includeDateFilter) {
     const byDate = includeDateFilter && DATE_FILTER_LIST.some(d => label.includes(d));
     const byDay  = !DATE_FILTER_LIST.length && DAY_FILTER && label.includes(TARGET_DAY_RAW);
     if (byDate || byDay) {
+      console.log(`→ [visitMonth] Navigating to detail for ${label}`);
       // カレンダー詳細ページに遷移
       await page.goto(href,           { waitUntil: 'networkidle2', timeout: 0 });
 
       // 【ここを修正】カレンダーのセルが１つ以上描画されるまで待つ（最大120秒）
+      console.log('→ [visitMonth] Waiting for calendar cells...');
       await page.waitForFunction(
         () => document.querySelectorAll('.tb-calendar tbody td').length > 0,
         { timeout: 120_000 }
       );
+      console.log('→ [visitMonth] Calendar cells detected');
 
       // 詳細ページでの reCAPTCHA 検知
       const ia = await page.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout:1000 }).catch(() => null);
       const ii = await page.waitForSelector('iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect', { timeout:1000 }).catch(() => null);
       if (ii && !ia) {
+        console.warn('⚠️ [visitMonth] reCAPTCHA challenge detected, skipping this slot');
         await page.goBack({ waitUntil: 'networkidle2' }).catch(() => {});
         continue;
       }
@@ -91,7 +95,10 @@ async function visitMonth(page, includeDateFilter) {
         Array.from(document.querySelectorAll('a')).some(a => a.textContent.includes(name)),
         TARGET_FACILITY_NAME
       );
-      if (found) hits.push(label);
+      if (found) {
+        console.log(`→ [visitMonth] Hit found on ${label}`);
+        hits.push(label);
+      }
 
       await page.goBack({ waitUntil: 'networkidle2' }).catch(() => {});
     }
@@ -101,10 +108,12 @@ async function visitMonth(page, includeDateFilter) {
 
 // ===== navigation helpers =====
 async function clickNext(page) {
+  console.log('→ [clickNext] Clicking next month');
   await page.click('input[id=nextMonth]');
   await page.waitForResponse(r => r.url().includes('/calendar_apply/calendar_select'));
 }
 async function clickPrev(page) {
+  console.log('→ [clickPrev] Clicking previous month');
   await page.click('input[id=prevMonth]');
   await page.waitForResponse(r => r.url().includes('/calendar_apply/calendar_select'));
 }
@@ -140,27 +149,28 @@ module.exports.run = async function() {
     );
 
     // 1) INDEX → カレンダー入口
-    console.log('→ Navigating to INDEX page');
+    console.log('→ [main] Navigating to INDEX page');
     await page.goto(INDEX_URL, { waitUntil: 'networkidle2', timeout: 0 });
-    console.log('→ Clicking into calendar entry');
+    console.log('→ [main] Clicking into calendar entry');
     await Promise.all([
       page.click('a[href*="/calendar_apply"]'),
       // カレンダー画面待機も無制限（実測用）
-      page.waitForSelector('#calendarContent', { timeout: 0 }).catch(() => {})
+      page.waitForSelector('#calendarContent', { timeout: 0 }).catch(() => console.warn('⚠️ [main] #calendarContent not found'))
     ]);
+    console.log('→ [main] Calendar entry loaded');
 
     // 2) reCAPTCHA チェック
     const frames = page.frames();
     const anchorFrame = frames.find(f => f.url().includes('/recaptcha/api2/anchor'));
     if (anchorFrame) {
-      console.log('→ Solving reCAPTCHA checkbox');
+      console.log('→ [main] Solving reCAPTCHA checkbox');
       await anchorFrame.click('.recaptcha-checkbox-border');
       await page.waitForTimeout(2000);
     }
     console.log('🟢 reCAPTCHA 通過または無し');
 
     // 3) 「次へ」送信
-    console.log('→ Submitting "次へ"');
+    console.log('→ [main] Submitting "次へ"');
     await Promise.all([
       page.click('input.button-select.button-primary[value="次へ"]'),
       page.waitForResponse(r => r.url().includes('/calendar_apply/calendar_select'))
@@ -178,14 +188,13 @@ module.exports.run = async function() {
 
     for (const step of sequence) {
       if (step.action) {
-        console.log(`→ Navigation step: ${step.action.name}`);
         await step.action(page);
       }
       const hits = await visitMonth(page, step.includeDate);
       for (const label of hits) {
         if (!notified.has(label)) {
           notified.add(label);
-          console.log('→ Notify:', label);
+          console.log('→ [main] Notify:', label);
           await axios.post(GAS_WEBHOOK_URL, {
             message: `【${TARGET_FACILITY_NAME}】予約状況更新\n日付：${label}\n詳細▶︎ ${INDEX_URL}`
           });
@@ -195,7 +204,7 @@ module.exports.run = async function() {
 
     // 5) ヒットなし通知
     if (notified.size === 0) {
-      console.log('→ No hits found, sending empty notification');
+      console.log('→ [main] No hits found, sending empty notification');
       await axios.post(GAS_WEBHOOK_URL, {
         message: `ℹ️ ${TARGET_FACILITY_NAME} の空きはありませんでした。\n監視URL▶︎ ${INDEX_URL}`
       });
