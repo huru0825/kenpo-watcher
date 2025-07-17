@@ -13,7 +13,7 @@ puppeteer.use(StealthPlugin());
   const INDEX_URL = 'https://as.its-kenpo.or.jp/service_category/index';
 
   const browser = await puppeteer.launch({
-    headless: 'new',
+    headless: true,
     executablePath: CHROME_PATH,
     args: [
       '--no-sandbox',
@@ -47,39 +47,43 @@ puppeteer.use(StealthPlugin());
       .catch(() => console.warn('⚠️ 入口ナビ待機タイムアウト'))
   ]);
 
-  console.log('→ reCAPTCHA iframe の出現を最大30秒待機');
-  try {
-    await page.waitForFunction(() => {
-      return [...document.querySelectorAll('iframe')].some(f => f.src.includes('/recaptcha/api2/anchor'));
-    }, { timeout: 30000 });
+  console.log('→ reCAPTCHA iframe 出現待機');
+  await page.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout: 30000 });
 
-    const frame = page.frames().find(f => f.url().includes('/recaptcha/api2/anchor'));
-    if (frame) {
-      console.log('✅ reCAPTCHA iframe 検出');
+  const frame = page.frames().find(f => f.url().includes('/recaptcha/api2/anchor'));
+  if (!frame) {
+    console.error('❌ reCAPTCHA iframe 取得失敗 → 処理中断');
+    process.exit(1);
+  }
 
-      let checkbox = await frame.$('.recaptcha-checkbox-border');
-      if (!checkbox) {
-        console.log('→ checkbox 再取得を最大10秒試み');
-        await page.waitForFunction(() => {
-          const iframe = document.querySelector('iframe[src*="/recaptcha/api2/anchor"]');
-          if (!iframe) return false;
-          const checkboxElement = iframe.contentWindow && iframe.contentDocument && iframe.contentDocument.querySelector('.recaptcha-checkbox-border');
-          return !!checkboxElement;
-        }, { timeout: 10000 }).catch(() => console.warn('⚠️ checkbox 再取得失敗'));
+  console.log('✅ reCAPTCHA iframe 検出');
 
-        checkbox = await frame.$('.recaptcha-checkbox-border');
-      }
+  const checkbox = await frame.$('#recaptcha-anchor');
+  if (!checkbox) {
+    console.error('❌ checkbox要素取得失敗 → 処理中断');
+    process.exit(1);
+  }
 
-      if (checkbox) {
-        console.log('→ checkbox を再クリック');
-        await frame.evaluate(el => el.click(), checkbox);
-        await page.waitForTimeout(3000);
-      } else {
-        console.warn('❌ checkbox 最終的にも取得できず');
-      }
-    }
-  } catch {
-    console.warn('❌ reCAPTCHA iframe 出現しなかった');
+  console.log('→ checkbox をクリック');
+  await checkbox.click();
+  await page.waitForTimeout(3000);
+
+  const hasChallenge = !!page.frames().find(f =>
+    f.url().includes('/bframe') || f.url().includes('/fallback')
+  );
+  if (hasChallenge) {
+    console.error('❌ 画像チャレンジ発生 → 自動突破不可 → 処理中断');
+    process.exit(1);
+  }
+
+  const passed = await frame.evaluate(() => {
+    const el = document.querySelector('#recaptcha-anchor');
+    return el?.getAttribute('aria-checked') === 'true';
+  });
+  console.log('✅ CAPTCHA通過確認:', passed);
+  if (!passed) {
+    console.warn('❌ CAPTCHA通過していない → 処理中断');
+    process.exit(1);
   }
 
   console.log('→ 「次へ」ボタンをクリック');
