@@ -64,12 +64,10 @@ module.exports.warmup = async function() {
 
 // ===== 月訪問ロジック =====
 async function visitMonth(page, includeDateFilter) {
-  // reCAPTCHA 検知
   const anchor    = await page.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout:1000 }).catch(() => null);
   const challenge = await page.waitForSelector('iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect', { timeout:1000 }).catch(() => null);
   if (challenge && !anchor) return [];
 
-  // ○アイコンのある日リンクを取得
   const available = await page.evaluate(() =>
     Array.from(document.querySelectorAll('a'))
       .filter(a => a.querySelector('img[src*="icon_circle.png"]'))
@@ -81,34 +79,30 @@ async function visitMonth(page, includeDateFilter) {
     const byDate = includeDateFilter && DATE_FILTER_LIST.some(d => label.includes(d));
     const byDay  = !DATE_FILTER_LIST.length && DAY_FILTER && label.includes(TARGET_DAY_RAW);
     if (byDate || byDay) {
-      console.log(`→ [visitMonth] Navigating to detail for ${label}`);
-      // カレンダー詳細ページに遷移（無制限タイムアウト）
-      await page.goto(href, { waitUntil:'networkidle2', timeout: 0 });
+      console.log(`→ [visitMonth] ${label} の詳細ページへ移動`);
+      await page.goto(href, { waitUntil:'networkidle2', timeout:0 });
 
-      console.log('→ [visitMonth] Waiting for calendar cells...');
-      // カレンダーセル描画待機（無制限タイムアウト）
+      console.log('→ [visitMonth] カレンダーセルの描画を待機中…');
       await page.waitForFunction(
         () => document.querySelectorAll('.tb-calendar tbody td').length > 0,
-        { timeout: 0 }
+        { timeout:0 }
       );
-      console.log('→ [visitMonth] Calendar cells detected');
+      console.log('→ [visitMonth] カレンダーセルを検出');
 
-      // 詳細ページでの reCAPTCHA 検知
       const ia = await page.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout:1000 }).catch(() => null);
       const ii = await page.waitForSelector('iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect', { timeout:1000 }).catch(() => null);
       if (ii && !ia) {
-        console.warn('⚠️ [visitMonth] reCAPTCHA challenge detected, skipping');
+        console.warn('⚠️ [visitMonth] 詳細ページで reCAPTCHA 検出のためスキップ');
         await page.goBack({ waitUntil:'networkidle2' }).catch(() => {});
         continue;
       }
 
-      // 施設名チェック
       const found = await page.evaluate(name =>
         Array.from(document.querySelectorAll('a')).some(a => a.textContent.includes(name)),
         TARGET_FACILITY_NAME
       );
       if (found) {
-        console.log(`→ [visitMonth] Hit found on ${label}`);
+        console.log(`→ [visitMonth] ${label} にマッチ`);
         hits.push(label);
       }
 
@@ -119,53 +113,61 @@ async function visitMonth(page, includeDateFilter) {
 }
 
 // ===== navigation helpers =====
-// インデックス→カレンダー（reCAPTCHA 画面）の submit ボタン
+// reCAPTCHA 画面の submit（「次へ」）→ カレンダー画面への遷移
 async function submitNext(page) {
-  console.log('→ [submitNext] Clicking "次へ"');
-  await Promise.all([
+  console.log('→ [submitNext] 「次へ」クリック');
+  const [, navigationResponse] = await Promise.all([
     page.click('input.button-select.button-primary[value="次へ"]'),
-    // networkidle2 まで無制限タイムアウトに変更
-    page.waitForNavigation({ waitUntil:'networkidle2', timeout: 0 })
+    page.waitForNavigation({ waitUntil:'networkidle2', timeout:0 })
   ]);
-  console.log('→ [submitNext] Calendar screen loaded');
+
+  // --- デバッグ出力（日本語） ---
+  console.log('→ [submitNext] レスポンスステータス:', navigationResponse.status());
+  const cookies = await page.cookies();
+  console.log('→ [submitNext] 取得クッキー:', cookies);
+  const html = await page.content();
+  console.log('→ [submitNext] ページHTML先頭1000文字:', html.slice(0,1000).replace(/\n/g,' '), '…');
+  // --- デバッグ出力ここまで ---
+
+  console.log('→ [submitNext] カレンダー画面表示完了');
 }
 
 // カレンダー表示後の月移動ボタン
 async function nextMonth(page) {
-  console.log('→ [nextMonth] Clicking "翌月"');
+  console.log('→ [nextMonth] 「翌月」クリック');
   await Promise.all([
     page.click('input.button-select.button-primary[value="次へ"]'),
-    page.waitForNavigation({ waitUntil:'networkidle2', timeout: 120_000 })
+    page.waitForNavigation({ waitUntil:'networkidle2', timeout:120_000 })
   ]);
-  console.log('→ [nextMonth] Moved to next month');
+  console.log('→ [nextMonth] 翌月に移動');
 }
 async function prevMonth(page) {
-  console.log('→ [prevMonth] Clicking "前へ"');
+  console.log('→ [prevMonth] 「前へ」クリック');
   await Promise.all([
     page.click('input.button-select.button-primary[value="前へ"]'),
-    page.waitForNavigation({ waitUntil:'networkidle2', timeout: 120_000 })
+    page.waitForNavigation({ waitUntil:'networkidle2', timeout:120_000 })
   ]);
-  console.log('→ [prevMonth] Moved to previous month');
+  console.log('→ [prevMonth] 前月に移動');
 }
 
 // ===== main =====
 module.exports.run = async function() {
   if (isRunning) {
-    console.log('▶️ Already running, skip');
+    console.log('▶️ 実行中のためスキップ');
     return;
   }
   isRunning = true;
 
   let browser;
   try {
-    console.log('🔄 Launching browser...', CHROME_PATH);
+    console.log('🔄 ブラウザ起動中…', CHROME_PATH);
     browser = await puppeteer.launch({
       headless: true,
       executablePath: CHROME_PATH,
       args: ['--no-sandbox','--disable-setuid-sandbox','--disable-blink-features=AutomationControlled'],
       env: { ...process.env, PUPPETEER_SKIP_DOWNLOAD:'true' }
     });
-    console.log('✅ Browser launched');
+    console.log('✅ ブラウザ起動完了');
 
     const page = await browser.newPage();
     await page.setUserAgent(
@@ -175,28 +177,28 @@ module.exports.run = async function() {
     );
 
     // 1) INDEX → カレンダー入口
-    console.log('→ [main] Navigating to INDEX page');
-    await page.goto(INDEX_URL, { waitUntil:'networkidle2', timeout: 0 });
-    console.log('→ [main] Clicking into calendar entry');
+    console.log('→ [main] INDEXページへ移動');
+    await page.goto(INDEX_URL, { waitUntil:'networkidle2', timeout:0 });
+    console.log('→ [main] カレンダー入口クリック');
     await Promise.all([
       page.click('a[href*="/calendar_apply"]'),
-      // カレンダー入口表示待機（無制限タイムアウト）
-      page.waitForSelector('#calendarContent', { timeout: 0 }).catch(() => console.warn('⚠️ [main] #calendarContent not found'))
+      page.waitForSelector('#calendarContent', { timeout:0 })
+        .catch(() => console.warn('⚠️ [main] #calendarContent 未検出'))
     ]);
-    console.log('→ [main] Calendar entry loaded');
+    console.log('→ [main] カレンダー入口表示完了');
 
     // 2) reCAPTCHA
     const frames = page.frames();
     const anchorFrame = frames.find(f => f.url().includes('/recaptcha/api2/anchor'));
     if (anchorFrame) {
-      console.log('→ [main] Solving reCAPTCHA...');
+      console.log('→ [main] reCAPTCHAチェック実行');
       await anchorFrame.click('.recaptcha-checkbox-border');
       await page.waitForTimeout(2000);
     }
-    console.log('🟢 reCAPTCHA passed or not present');
+    console.log('🟢 reCAPTCHA通過または無し');
 
-    // 3) インデックス→カレンダー画面への submit
-    console.log('→ [main] Submitting "次へ"');
+    // 3) インデックス→カレンダー画面submit
+    console.log('→ [main] 「次へ」送信');
     await submitNext(page);
 
     // 4) 月巡回シーケンス
@@ -215,7 +217,7 @@ module.exports.run = async function() {
       for (const label of hits) {
         if (!notified.has(label)) {
           notified.add(label);
-          console.log('→ [main] Notify:', label);
+          console.log('→ [main] 通知対象:', label);
           await axios.post(GAS_WEBHOOK_URL, {
             message: `【${TARGET_FACILITY_NAME}】予約状況更新\n日付：${label}\n詳細▶︎${INDEX_URL}`
           });
@@ -225,20 +227,20 @@ module.exports.run = async function() {
 
     // 5) ヒットなし通知
     if (notified.size === 0) {
-      console.log('→ [main] No hits, sending empty notification');
+      console.log('→ [main] 空きなし通知');
       await axios.post(GAS_WEBHOOK_URL, {
         message: `ℹ️ ${TARGET_FACILITY_NAME} の空きはありませんでした。\n監視URL▶︎${INDEX_URL}`
       });
     }
 
   } catch (err) {
-    console.error('⚠️ Exception caught:', err);
+    console.error('⚠️ 例外発生:', err);
     await axios.post(GAS_WEBHOOK_URL, {
       message: '⚠️ エラーが発生しました：\n' + (err.stack || err.message)
     });
   } finally {
     if (browser) {
-      console.log('→ Closing browser');
+      console.log('→ ブラウザを閉じます');
       await browser.close();
     }
     isRunning = false;
