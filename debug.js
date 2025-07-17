@@ -27,21 +27,76 @@ puppeteer.use(StealthPlugin());
 
   const page = await browser.newPage();
 
-  // spoof対策: navigatorのプロパティ上書き
+  // 事前に手動突破した reCAPTCHA Cookie を注入
+  await page.setCookie(
+    {
+      name: 'AWSALBTG',
+      value: 'QEh7+PdHg6v7Ebrpnvpk3bVp5OQLulsS2xt7nMr7tI1wjUNtENa0Y6U/iR7cDcsyODI0kjTkN/qrxWf//IVcGRaAbvjpbCyjHDm+St+zc4SX5UfzQauZnaaCFEWTInJ/ascvFm+DxXn9W4bIqrqUwneL9NvLkCaK+CrOM5VICqVIdamnWZo=',
+      domain: 'as.its-kenpo.or.jp',
+      path: '/',
+      secure: false
+    },
+    {
+      name: '_ga',
+      value: 'GA1.1.581626692.1752773516',
+      domain: '.its-kenpo.or.jp',
+      path: '/'
+    },
+    {
+      name: '_src_session',
+      value: '3f7402f99d6ba399eddcbe570763be7f',
+      domain: 'as.its-kenpo.or.jp',
+      path: '/',
+      secure: true,
+      httpOnly: true
+    },
+    {
+      name: '_ga_YHTH3JM9GY',
+      value: 'GS2.1.s1752773516$o1$g0$t1752773516$j60$l0$h0',
+      domain: '.its-kenpo.or.jp',
+      path: '/'
+    },
+    {
+      name: '_ga_R7KBSKLL21',
+      value: 'GS2.1.s1752773516$o1$g0$t1752773516$j60$l0$h0',
+      domain: '.its-kenpo.or.jp',
+      path: '/'
+    },
+    {
+      name: 'AWSALB',
+      value: 'epMaR56+AMYWujctzv/fkcIj18gyxKDOQOqVoflWrFp/6EVfO6Q8sK0Yf2rIP//F8wylQdEW3/vZVyjvhNx+AP3avWpomolWd5WFKWVLHlwUe/UM1s/dz+9K00Uv',
+      domain: 'as.its-kenpo.or.jp',
+      path: '/'
+    },
+    {
+      name: 'AWSALBCORS',
+      value: 'epMaR56+AMYWujctzv/fkcIj18gyxKDOQOqVoflWrFp/6EVfO6Q8sK0Yf2rIP//F8wylQdEW3/vZVyjvhNx+AP3avWpomolWd5WFKWVLHlwUe/UM1s/dz+9K00Uv',
+      domain: 'as.its-kenpo.or.jp',
+      path: '/',
+      secure: true
+    },
+    {
+      name: 'AWSALBTGCORS',
+      value: 'QEh7+PdHg6v7Ebrpnvpk3bVp5OQLulsS2xt7nMr7tI1wjUNtENa0Y6U/iR7cDcsyODI0kjTkN/qrxWf//IVcGRaAbvjpbCyjHDm+St+zc4SX5UfzQauZnaaCFEWTInJ/ascvFm+DxXn9W4bIqrqUwneL9NvLkCaK+CrOM5VICqVIdamnWZo=',
+      domain: 'as.its-kenpo.or.jp',
+      path: '/',
+      secure: true
+    }
+  );
+
+  // spoof対策
   await page.evaluateOnNewDocument(() => {
     Object.defineProperty(navigator, 'webdriver', { get: () => false });
     Object.defineProperty(navigator, 'languages', { get: () => ['ja-JP', 'ja'] });
     Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
   });
 
-  // Google CONSENT Cookie 追加
   await page.setCookie({
     name: 'CONSENT',
     value: 'YES+1',
     domain: '.google.com'
   });
 
-  // ランダムなViewportとUser-Agent設定
   await page.setViewport({
     width: 1200 + Math.floor(Math.random() * 300),
     height: 700 + Math.floor(Math.random() * 300),
