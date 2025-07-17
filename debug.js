@@ -13,7 +13,7 @@ puppeteer.use(StealthPlugin());
   const INDEX_URL = 'https://as.its-kenpo.or.jp/service_category/index';
 
   const browser = await puppeteer.launch({
-    headless: true,
+    headless: 'new',
     executablePath: CHROME_PATH,
     args: [
       '--no-sandbox',
@@ -64,9 +64,20 @@ puppeteer.use(StealthPlugin());
     process.exit(1);
   }
 
-  console.log('→ checkbox をクリック');
-  await checkbox.click();
-  await page.waitForTimeout(3000);
+  let passed = false;
+  for (let i = 0; i < 3; i++) {
+    console.log(`→ checkbox をクリック（${i + 1}回目）`);
+    await checkbox.click();
+    await page.waitForTimeout(3000);
+
+    passed = await frame.evaluate(() => {
+      const el = document.querySelector('#recaptcha-anchor');
+      return el?.getAttribute('aria-checked') === 'true';
+    });
+    if (passed) break;
+  }
+
+  console.log('✅ CAPTCHA通過確認:', passed);
 
   const hasChallenge = !!page.frames().find(f =>
     f.url().includes('/bframe') || f.url().includes('/fallback')
@@ -76,11 +87,6 @@ puppeteer.use(StealthPlugin());
     process.exit(1);
   }
 
-  const passed = await frame.evaluate(() => {
-    const el = document.querySelector('#recaptcha-anchor');
-    return el?.getAttribute('aria-checked') === 'true';
-  });
-  console.log('✅ CAPTCHA通過確認:', passed);
   if (!passed) {
     console.warn('❌ CAPTCHA通過していない → 処理中断');
     process.exit(1);
