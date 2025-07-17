@@ -1,5 +1,3 @@
-// debug.js
-
 const puppeteer     = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 
@@ -51,15 +49,28 @@ puppeteer.use(StealthPlugin());
       .catch(() => console.warn('⚠️ 入口ナビ待機タイムアウト'))
   ]);
 
-  // 3) reCAPTCHA iframe
-  console.log('→ reCAPTCHA iframe 検出');
-  const anchorFrame = page.frames().find(f => f.url().includes('/recaptcha/api2/anchor'));
-  if (anchorFrame) {
-    console.log('→ reCAPTCHA チェックボックスクリック');
-    await anchorFrame.click('.recaptcha-checkbox-border');
-    await page.waitForTimeout(3000);
-  } else {
-    console.log('→ reCAPTCHA iframe が見つかりませんでした');
+  // 3) reCAPTCHA iframe を最大30秒待機
+  console.log('→ reCAPTCHA iframe の出現を最大30秒待機');
+  try {
+    await page.waitForFunction(() => {
+      return [...document.querySelectorAll('iframe')].some(f => f.src.includes('/recaptcha/api2/anchor'));
+    }, { timeout: 30000 });
+
+    const frame = page.frames().find(f => f.url().includes('/recaptcha/api2/anchor'));
+    if (frame) {
+      console.log('✅ reCAPTCHA iframe 検出');
+
+      const checkbox = await frame.$('.recaptcha-checkbox-border');
+      if (checkbox) {
+        console.log('→ checkbox をJSで強制クリック');
+        await frame.evaluate(el => el.click(), checkbox);
+        await page.waitForTimeout(3000);
+      } else {
+        console.warn('⚠️ checkbox がまだ非表示か未描画');
+      }
+    }
+  } catch {
+    console.warn('❌ reCAPTCHA iframe 出現しなかった');
   }
 
   // 4) 「次へ」ボタン送信
