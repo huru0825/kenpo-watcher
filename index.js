@@ -64,10 +64,12 @@ module.exports.warmup = async function() {
 
 // ===== 月訪問ロジック =====
 async function visitMonth(page, includeDateFilter) {
+  // reCAPTCHA 検知
   const anchor    = await page.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout:1000 }).catch(() => null);
   const challenge = await page.waitForSelector('iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect', { timeout:1000 }).catch(() => null);
   if (challenge && !anchor) return [];
 
+  // ○アイコンのある日リンクを取得
   const available = await page.evaluate(() =>
     Array.from(document.querySelectorAll('a'))
       .filter(a => a.querySelector('img[src*="icon_circle.png"]'))
@@ -80,15 +82,16 @@ async function visitMonth(page, includeDateFilter) {
     const byDay  = !DATE_FILTER_LIST.length && DAY_FILTER && label.includes(TARGET_DAY_RAW);
     if (byDate || byDay) {
       console.log(`→ [visitMonth] ${label} の詳細ページへ移動`);
-      await page.goto(href, { waitUntil:'networkidle2', timeout:0 });
+      await page.goto(href, { waitUntil:'networkidle2', timeout: 0 });
 
       console.log('→ [visitMonth] カレンダーセルの描画を待機中…');
       await page.waitForFunction(
         () => document.querySelectorAll('.tb-calendar tbody td').length > 0,
-        { timeout:0 }
+        { timeout: 0 }
       );
       console.log('→ [visitMonth] カレンダーセルを検出');
 
+      // 詳細ページで reCAPTCHA が新たに出たらスキップ
       const ia = await page.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout:1000 }).catch(() => null);
       const ii = await page.waitForSelector('iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect', { timeout:1000 }).catch(() => null);
       if (ii && !ia) {
@@ -97,6 +100,7 @@ async function visitMonth(page, includeDateFilter) {
         continue;
       }
 
+      // 施設名チェック
       const found = await page.evaluate(name =>
         Array.from(document.querySelectorAll('a')).some(a => a.textContent.includes(name)),
         TARGET_FACILITY_NAME
@@ -116,19 +120,9 @@ async function visitMonth(page, includeDateFilter) {
 // reCAPTCHA 画面の submit（「次へ」）→ カレンダー画面への遷移
 async function submitNext(page) {
   console.log('→ [submitNext] 「次へ」クリック');
-  const [, navigationResponse] = await Promise.all([
-    page.click('input.button-select.button-primary[value="次へ"]'),
-    page.waitForNavigation({ waitUntil:'networkidle2', timeout:0 })
-  ]);
-
-  // --- デバッグ出力（日本語） ---
-  console.log('→ [submitNext] レスポンスステータス:', navigationResponse.status());
-  const cookies = await page.cookies();
-  console.log('→ [submitNext] 取得クッキー:', cookies);
-  const html = await page.content();
-  console.log('→ [submitNext] ページHTML先頭1000文字:', html.slice(0,1000).replace(/\n/g,' '), '…');
-  // --- デバッグ出力ここまで ---
-
+  await page.click('input.button-select.button-primary[value="次へ"]');
+  console.log('→ [submitNext] カレンダー画面の表示待機…');
+  await page.waitForSelector('#calendarContent', { timeout: 120_000 });
   console.log('→ [submitNext] カレンダー画面表示完了');
 }
 
@@ -182,8 +176,7 @@ module.exports.run = async function() {
     console.log('→ [main] カレンダー入口クリック');
     await Promise.all([
       page.click('a[href*="/calendar_apply"]'),
-      page.waitForSelector('#calendarContent', { timeout:0 })
-        .catch(() => console.warn('⚠️ [main] #calendarContent 未検出'))
+      page.waitForSelector('#calendarContent', { timeout:0 }).catch(() => console.warn('⚠️ [main] #calendarContent 未検出'))
     ]);
     console.log('→ [main] カレンダー入口表示完了');
 
