@@ -1,4 +1,4 @@
-const puppeteer     = require('puppeteer-extra');
+const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 
 puppeteer.use(StealthPlugin());
@@ -21,9 +21,9 @@ puppeteer.use(StealthPlugin());
       '--disable-blink-features=AutomationControlled'
     ]
   });
+
   const page = await browser.newPage();
 
-  // --- ログキャプチャ ---
   page.on('console', msg => console.log('PAGE ▶', msg.type(), msg.text()));
   page.on('pageerror', err => console.error('PAGE ERROR ▶', err));
   page.on('requestfailed', req => console.warn('REQUEST FAILED ▶', req.url(), req.failure()));
@@ -37,11 +37,9 @@ puppeteer.use(StealthPlugin());
     }
   });
 
-  // 1) INDEXページへ
   console.log('🔄 INDEXページへ移動');
   await page.goto(INDEX_URL, { waitUntil: 'networkidle2', timeout: 0 });
 
-  // 2) カレンダー入口リンク
   console.log('→ カレンダー入口クリック');
   await Promise.all([
     page.click('a[href*="/calendar_apply"]'),
@@ -49,7 +47,6 @@ puppeteer.use(StealthPlugin());
       .catch(() => console.warn('⚠️ 入口ナビ待機タイムアウト'))
   ]);
 
-  // 3) reCAPTCHA iframe を最大30秒待機
   console.log('→ reCAPTCHA iframe の出現を最大30秒待機');
   try {
     await page.waitForFunction(() => {
@@ -60,43 +57,50 @@ puppeteer.use(StealthPlugin());
     if (frame) {
       console.log('✅ reCAPTCHA iframe 検出');
 
-      const checkbox = await frame.$('.recaptcha-checkbox-border');
+      let checkbox = await frame.$('.recaptcha-checkbox-border');
+      if (!checkbox) {
+        console.log('→ checkbox 再取得を最大10秒試み');
+        await page.waitForFunction(() => {
+          const iframe = document.querySelector('iframe[src*="/recaptcha/api2/anchor"]');
+          if (!iframe) return false;
+          const checkboxElement = iframe.contentWindow && iframe.contentDocument && iframe.contentDocument.querySelector('.recaptcha-checkbox-border');
+          return !!checkboxElement;
+        }, { timeout: 10000 }).catch(() => console.warn('⚠️ checkbox 再取得失敗'));
+
+        checkbox = await frame.$('.recaptcha-checkbox-border');
+      }
+
       if (checkbox) {
-        console.log('→ checkbox をJSで強制クリック');
+        console.log('→ checkbox を再クリック');
         await frame.evaluate(el => el.click(), checkbox);
         await page.waitForTimeout(3000);
       } else {
-        console.warn('⚠️ checkbox がまだ非表示か未描画');
+        console.warn('❌ checkbox 最終的にも取得できず');
       }
     }
   } catch {
     console.warn('❌ reCAPTCHA iframe 出現しなかった');
   }
 
-  // 4) 「次へ」ボタン送信
   console.log('→ 「次へ」ボタンをクリック');
   await page.click('input.button-select.button-primary[value="次へ"]');
 
-  // 5) navigation 完了待ち
   console.log('→ navigation 完了待機');
   await page.waitForNavigation({ waitUntil: 'networkidle0', timeout: 60000 })
     .catch(() => console.warn('⚠️ navigation networkidle0 タイムアウト'));
 
-  // 6) カレンダー取得XHR を待機
   console.log('→ カレンダー取得XHR待機');
-  await page.waitForResponse(r =>
-    r.url().includes('/calendar_apply/calendar_select') && r.status() === 200,
+  await page.waitForResponse(
+    r => r.url().includes('/calendar_apply/calendar_select') && r.status() === 200,
     { timeout: 60000 }
   ).catch(() => console.warn('⚠️ カレンダーXHR タイムアウト'));
 
-  // 7) カレンダーDOM更新待機
   console.log('→ カレンダー表セルが描画されるまで待機');
   await page.waitForFunction(
     () => document.querySelectorAll('#calendarContent table.tb-calendar tbody td').length > 0,
     { timeout: 60000 }
   ).catch(() => console.error('❌ カレンダーセル描画タイムアウト'));
 
-  // 8) 確認ログ出力
   const cellCount = await page.$$eval(
     '#calendarContent table.tb-calendar tbody td',
     tds => tds.length
@@ -109,7 +113,6 @@ puppeteer.use(StealthPlugin());
   );
   console.log('→ セルテキストサンプル:', sampleTexts);
 
-  // 終了
   console.log('▶ ブラウザを閉じます');
   await browser.close();
 })();
