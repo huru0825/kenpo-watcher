@@ -108,21 +108,20 @@ async function visitMonth(page, includeDateFilter) {
 
 // ===== navigation helpers =====
 async function clickNext(page) {
-  console.log('→ [clickNext] Clicking next month');
+  console.log('→ [clickNext] Clicking "次へ"');
   await Promise.all([
-    page.click('input[id=nextMonth]'),
-    // 「次へ」クリック後、networkidle2 まで最大120秒待機
+    page.click('input.button-select.button-primary[value="次へ"]'),
     page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 120_000 })
   ]);
-  console.log('→ [clickNext] Next month loaded');
+  console.log('→ [clickNext] Calendar moved to next month');
 }
 async function clickPrev(page) {
-  console.log('→ [clickPrev] Clicking previous month');
+  console.log('→ [clickPrev] Clicking "前へ"');
   await Promise.all([
-    page.click('input[id=prevMonth]'),
+    page.click('input.button-select.button-primary[value="前へ"]'),
     page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 120_000 })
   ]);
-  console.log('→ [clickPrev] Previous month loaded');
+  console.log('→ [clickPrev] Calendar moved to previous month');
 }
 
 // ===== main =====
@@ -161,7 +160,8 @@ module.exports.run = async function() {
     console.log('→ [main] Clicking into calendar entry');
     await Promise.all([
       page.click('a[href*="/calendar_apply"]'),
-      page.waitForSelector('#calendarContent', { timeout: 0 }).catch(() => console.warn('⚠️ [main] #calendarContent not found'))
+      page.waitForSelector('#calendarContent', { timeout: 0 })
+        .catch(() => console.warn('⚠️ [main] #calendarContent not found'))
     ]);
     console.log('→ [main] Calendar entry loaded');
 
