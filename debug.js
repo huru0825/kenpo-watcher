@@ -15,10 +15,12 @@ puppeteer.use(StealthPlugin());
 
   const browser = await puppeteer.launch({
     headless: 'new',
-    executablePath: CHROME_PATH,
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
+      '--disable-web-security',
+      '--disable-features=IsolateOrigins,site-per-process',
       '--disable-blink-features=AutomationControlled'
     ]
   });
