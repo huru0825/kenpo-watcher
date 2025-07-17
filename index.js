@@ -62,14 +62,19 @@ module.exports.warmup = async function() {
   await browser.close();
 };
 
+// ===== 共通：カレンダー領域描画待機 =====
+async function waitCalendar(page) {
+  console.log('→ カレンダー領域の検出待機…');
+  await page.waitForSelector('#calendarContent table.tb-calendar', { timeout: 120_000 });
+  console.log('→ カレンダー領域検出完了');
+}
+
 // ===== 月訪問ロジック =====
 async function visitMonth(page, includeDateFilter) {
-  // reCAPTCHA 検知
   const anchor    = await page.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout:1000 }).catch(() => null);
   const challenge = await page.waitForSelector('iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect', { timeout:1000 }).catch(() => null);
   if (challenge && !anchor) return [];
 
-  // ○アイコンのある日リンクを取得
   const available = await page.evaluate(() =>
     Array.from(document.querySelectorAll('a'))
       .filter(a => a.querySelector('img[src*="icon_circle.png"]'))
@@ -89,18 +94,16 @@ async function visitMonth(page, includeDateFilter) {
         () => document.querySelectorAll('.tb-calendar tbody td').length > 0,
         { timeout: 0 }
       );
-      console.log('→ [visitMonth] カレンダーセルを検出');
+      console.log('→ [visitMonth] カレンダーセル検出');
 
-      // 詳細ページで reCAPTCHA が新たに出たらスキップ
       const ia = await page.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout:1000 }).catch(() => null);
       const ii = await page.waitForSelector('iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect', { timeout:1000 }).catch(() => null);
       if (ii && !ia) {
-        console.warn('⚠️ [visitMonth] 詳細ページで reCAPTCHA 検出のためスキップ');
+        console.warn('⚠️ [visitMonth] 詳細ページで reCAPTCHA 検出→スキップ');
         await page.goBack({ waitUntil:'networkidle2' }).catch(() => {});
         continue;
       }
 
-      // 施設名チェック
       const found = await page.evaluate(name =>
         Array.from(document.querySelectorAll('a')).some(a => a.textContent.includes(name)),
         TARGET_FACILITY_NAME
@@ -117,31 +120,30 @@ async function visitMonth(page, includeDateFilter) {
 }
 
 // ===== navigation helpers =====
-// reCAPTCHA 画面の submit（「次へ」）→ カレンダー画面への遷移
+// reCAPTCHA画面→カレンダー画面への submit
 async function submitNext(page) {
   console.log('→ [submitNext] 「次へ」クリック');
   await page.click('input.button-select.button-primary[value="次へ"]');
-  console.log('→ [submitNext] カレンダー画面の表示待機…');
-  await page.waitForSelector('#calendarContent', { timeout: 120_000 });
-  console.log('→ [submitNext] カレンダー画面表示完了');
+  await waitCalendar(page);
+  console.log('→ [submitNext] カレンダー取得XHR待機…');
+  await page.waitForResponse(r =>
+    r.url().includes('/calendar_apply/calendar_select') && r.status() === 200
+  );
+  console.log('→ [submitNext] カレンダーデータ取得完了');
 }
 
-// カレンダー表示後の月移動ボタン
+// カレンダー画面→翌月移動
 async function nextMonth(page) {
   console.log('→ [nextMonth] 「翌月」クリック');
-  await Promise.all([
-    page.click('input.button-select.button-primary[value="次へ"]'),
-    page.waitForNavigation({ waitUntil:'networkidle2', timeout:120_000 })
-  ]);
-  console.log('→ [nextMonth] 翌月に移動');
+  await page.click('input.button-select.button-primary[value="次へ"]');
+  await waitCalendar(page);
 }
+
+// カレンダー画面→前月移動
 async function prevMonth(page) {
   console.log('→ [prevMonth] 「前へ」クリック');
-  await Promise.all([
-    page.click('input.button-select.button-primary[value="前へ"]'),
-    page.waitForNavigation({ waitUntil:'networkidle2', timeout:120_000 })
-  ]);
-  console.log('→ [prevMonth] 前月に移動');
+  await page.click('input.button-select.button-primary[value="前へ"]');
+  await waitCalendar(page);
 }
 
 // ===== main =====
@@ -172,11 +174,11 @@ module.exports.run = async function() {
 
     // 1) INDEX → カレンダー入口
     console.log('→ [main] INDEXページへ移動');
-    await page.goto(INDEX_URL, { waitUntil:'networkidle2', timeout:0 });
+    await page.goto(INDEX_URL, { waitUntil:'networkidle2', timeout: 0 });
     console.log('→ [main] カレンダー入口クリック');
     await Promise.all([
       page.click('a[href*="/calendar_apply"]'),
-      page.waitForSelector('#calendarContent', { timeout:0 }).catch(() => console.warn('⚠️ [main] #calendarContent 未検出'))
+      page.waitForSelector('#calendarContent', { timeout: 0 }).catch(() => console.warn('⚠️ [main] #calendarContent 未検出'))
     ]);
     console.log('→ [main] カレンダー入口表示完了');
 
@@ -190,23 +192,23 @@ module.exports.run = async function() {
     }
     console.log('🟢 reCAPTCHA通過または無し');
 
-    // 3) インデックス→カレンダー画面submit
+    // 3) インデックス→カレンダー画面へ
     console.log('→ [main] 「次へ」送信');
     await submitNext(page);
 
     // 4) 月巡回シーケンス
     const sequence = [
-      { action: null,       includeDate: true  },
-      { action: nextMonth,  includeDate: false },
-      { action: nextMonth,  includeDate: false },
-      { action: prevMonth,  includeDate: false },
-      { action: prevMonth,  includeDate: true  }
+      { action: null,      includeDate: true  },
+      { action: nextMonth, includeDate: false },
+      { action: nextMonth, includeDate: false },
+      { action: prevMonth, includeDate: false },
+      { action: prevMonth, includeDate: true  }
     ];
     const notified = new Set();
 
-    for (const step of sequence) {
-      if (step.action) await step.action(page);
-      const hits = await visitMonth(page, step.includeDate);
+    for (const { action, includeDate } of sequence) {
+      if (action) await action(page);
+      const hits = await visitMonth(page, includeDate);
       for (const label of hits) {
         if (!notified.has(label)) {
           notified.add(label);
@@ -218,7 +220,7 @@ module.exports.run = async function() {
       }
     }
 
-    // 5) ヒットなし通知
+    // 5) 空きなし通知
     if (notified.size === 0) {
       console.log('→ [main] 空きなし通知');
       await axios.post(GAS_WEBHOOK_URL, {
