@@ -14,16 +14,16 @@ puppeteer.use(StealthPlugin());
   const INDEX_URL = 'https://as.its-kenpo.or.jp/service_category/index';
 
   const browser = await puppeteer.launch({
-    headless: 'new',
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-web-security',
-      '--disable-features=IsolateOrigins,site-per-process',
-      '--disable-blink-features=AutomationControlled'
-    ]
-  });
+  headless: 'new',
+  executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
+  args: [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--disable-web-security',
+    '--disable-features=IsolateOrigins,site-per-process',
+    '--disable-blink-features=AutomationControlled'
+  ]
+});
 
   const page = await browser.newPage();
 
