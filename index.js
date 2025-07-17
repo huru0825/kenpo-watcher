@@ -70,10 +70,10 @@ async function visitMonth(page, includeDateFilter) {
     const byDay  = !DATE_FILTER_LIST.length && DAY_FILTER && label.includes(TARGET_DAY_RAW);
     if (byDate || byDay) {
       console.log(`→ [visitMonth] Navigating to detail for ${label}`);
-      // カレンダー詳細ページに遷移
-      await page.goto(href,           { waitUntil: 'networkidle2', timeout: 0 });
+      // カレンダー詳細ページに遷移（無制限タイムアウトで実測用）
+      await page.goto(href, { waitUntil: 'networkidle2', timeout: 0 });
 
-      // 【ここを修正】カレンダーのセルが１つ以上描画されるまで待つ（最大120秒）
+      // 【修正】カレンダーのセルが１つ以上描画されるまで待つ（最大120秒）
       console.log('→ [visitMonth] Waiting for calendar cells...');
       await page.waitForFunction(
         () => document.querySelectorAll('.tb-calendar tbody td').length > 0,
@@ -109,13 +109,20 @@ async function visitMonth(page, includeDateFilter) {
 // ===== navigation helpers =====
 async function clickNext(page) {
   console.log('→ [clickNext] Clicking next month');
-  await page.click('input[id=nextMonth]');
-  await page.waitForResponse(r => r.url().includes('/calendar_apply/calendar_select'));
+  await Promise.all([
+    page.click('input[id=nextMonth]'),
+    // 「次へ」クリック後、networkidle2 まで最大120秒待機
+    page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 120_000 })
+  ]);
+  console.log('→ [clickNext] Next month loaded');
 }
 async function clickPrev(page) {
   console.log('→ [clickPrev] Clicking previous month');
-  await page.click('input[id=prevMonth]');
-  await page.waitForResponse(r => r.url().includes('/calendar_apply/calendar_select'));
+  await Promise.all([
+    page.click('input[id=prevMonth]'),
+    page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 120_000 })
+  ]);
+  console.log('→ [clickPrev] Previous month loaded');
 }
 
 // ===== main =====
@@ -154,7 +161,6 @@ module.exports.run = async function() {
     console.log('→ [main] Clicking into calendar entry');
     await Promise.all([
       page.click('a[href*="/calendar_apply"]'),
-      // カレンダー画面待機も無制限（実測用）
       page.waitForSelector('#calendarContent', { timeout: 0 }).catch(() => console.warn('⚠️ [main] #calendarContent not found'))
     ]);
     console.log('→ [main] Calendar entry loaded');
@@ -171,10 +177,7 @@ module.exports.run = async function() {
 
     // 3) 「次へ」送信
     console.log('→ [main] Submitting "次へ"');
-    await Promise.all([
-      page.click('input.button-select.button-primary[value="次へ"]'),
-      page.waitForResponse(r => r.url().includes('/calendar_apply/calendar_select'))
-    ]);
+    await clickNext(page);
 
     // 4) 月巡回シーケンス
     const sequence = [
@@ -213,7 +216,7 @@ module.exports.run = async function() {
   } catch (err) {
     console.error('⚠️ 例外をキャッチ:', err);
     await axios.post(GAS_WEBHOOK_URL, {
-      message: '⚠️ エラーが発生しました：\n' + (err.stack||err.message)
+      message: '⚠️ エラーが発生しました：\n' + (err.stack || err.message)
     });
   } finally {
     if (browser) {
