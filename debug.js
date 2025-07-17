@@ -14,18 +14,32 @@ puppeteer.use(StealthPlugin());
   const INDEX_URL = 'https://as.its-kenpo.or.jp/service_category/index';
 
   const browser = await puppeteer.launch({
-  headless: 'new',
-  executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
-  args: [
-    '--no-sandbox',
-    '--disable-setuid-sandbox',
-    '--disable-web-security',
-    '--disable-features=IsolateOrigins,site-per-process',
-    '--disable-blink-features=AutomationControlled'
-  ]
-});
+    headless: 'new',
+    executablePath: CHROME_PATH,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-web-security',
+      '--disable-features=IsolateOrigins,site-per-process',
+      '--disable-blink-features=AutomationControlled'
+    ]
+  });
 
   const page = await browser.newPage();
+
+  // spoof対策: navigatorのプロパティ上書き
+  await page.evaluateOnNewDocument(() => {
+    Object.defineProperty(navigator, 'webdriver', { get: () => false });
+    Object.defineProperty(navigator, 'languages', { get: () => ['ja-JP', 'ja'] });
+    Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+  });
+
+  // Google CONSENT Cookie 追加
+  await page.setCookie({
+    name: 'CONSENT',
+    value: 'YES+1',
+    domain: '.google.com'
+  });
 
   // ランダムなViewportとUser-Agent設定
   await page.setViewport({
@@ -37,16 +51,6 @@ puppeteer.use(StealthPlugin());
   await page.setUserAgent(UA);
   await page.setExtraHTTPHeaders({ 'Accept-Language': 'ja-JP,ja;q=0.9' });
 
-  /*
-  // リソース制限（画像・CSS・フォントの読み込みを停止）
-  await page.setRequestInterception(true);
-  page.on('request', req => {
-    const type = req.resourceType();
-    if (['image', 'stylesheet', 'font'].includes(type)) req.abort();
-    else req.continue();
-  });
-  */
-  
   page.on('console', msg => console.log('PAGE ▶', msg.type(), msg.text()));
   page.on('pageerror', err => console.error('PAGE ERROR ▶', err));
   page.on('requestfailed', req => console.warn('REQUEST FAILED ▶', req.url(), req.failure()));
@@ -87,7 +91,6 @@ puppeteer.use(StealthPlugin());
     process.exit(1);
   }
 
-  // CAPTCHAチェック：最大3回クリック＋確認
   let passed = false;
   for (let i = 0; i < 3; i++) {
     console.log(`→ checkbox をクリック（${i + 1}回目）`);
@@ -102,7 +105,6 @@ puppeteer.use(StealthPlugin());
   }
   console.log('✅ CAPTCHA通過確認:', passed);
 
-  // 画像チャレンジまたはフォールバック iframe 検出
   const hasChallenge = !!page.frames().find(f =>
     f.url().includes('/bframe') || f.url().includes('/fallback')
   );
