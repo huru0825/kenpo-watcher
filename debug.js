@@ -58,9 +58,9 @@ puppeteer.use(StealthPlugin());
 
   console.log('✅ reCAPTCHA iframe 検出');
 
-  const checkbox = await frame.$('#recaptcha-anchor');
+  const checkbox = await frame.waitForSelector('#recaptcha-anchor', { visible: true, timeout: 40000 }).catch(() => null);
   if (!checkbox) {
-    console.error('❌ checkbox要素取得失敗 → 処理中断');
+    console.error('❌ checkbox要素取得失敗（描画されていない or タイムアウト）→ 処理中断');
     process.exit(1);
   }
 
