@@ -71,10 +71,12 @@ async function waitCalendar(page) {
 
 // ===== 月訪問ロジック =====
 async function visitMonth(page, includeDateFilter) {
+  // reCAPTCHA 検知
   const anchor    = await page.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout:1000 }).catch(() => null);
   const challenge = await page.waitForSelector('iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect', { timeout:1000 }).catch(() => null);
   if (challenge && !anchor) return [];
 
+  // ○アイコンのある日リンクを取得
   const available = await page.evaluate(() =>
     Array.from(document.querySelectorAll('a'))
       .filter(a => a.querySelector('img[src*="icon_circle.png"]'))
@@ -96,6 +98,7 @@ async function visitMonth(page, includeDateFilter) {
       );
       console.log('→ [visitMonth] カレンダーセル検出');
 
+      // 詳細ページで reCAPTCHA が新たに出たらスキップ
       const ia = await page.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout:1000 }).catch(() => null);
       const ii = await page.waitForSelector('iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect', { timeout:1000 }).catch(() => null);
       if (ii && !ia) {
@@ -104,6 +107,7 @@ async function visitMonth(page, includeDateFilter) {
         continue;
       }
 
+      // 施設名チェック
       const found = await page.evaluate(name =>
         Array.from(document.querySelectorAll('a')).some(a => a.textContent.includes(name)),
         TARGET_FACILITY_NAME
@@ -120,7 +124,7 @@ async function visitMonth(page, includeDateFilter) {
 }
 
 // ===== navigation helpers =====
-// reCAPTCHA画面→カレンダー画面への submit
+// reCAPTCHA画面→カレンダー画面への submit（「次へ」ボタン）
 async function submitNext(page) {
   console.log('→ [submitNext] 「次へ」クリック');
   await page.click('input.button-select.button-primary[value="次へ"]');
@@ -178,7 +182,8 @@ module.exports.run = async function() {
     console.log('→ [main] カレンダー入口クリック');
     await Promise.all([
       page.click('a[href*="/calendar_apply"]'),
-      page.waitForSelector('#calendarContent', { timeout: 0 }).catch(() => console.warn('⚠️ [main] #calendarContent 未検出'))
+      page.waitForSelector('#calendarContent', { timeout: 0 })
+        .catch(() => console.warn('⚠️ [main] #calendarContent 未検出'))
     ]);
     console.log('→ [main] カレンダー入口表示完了');
 
