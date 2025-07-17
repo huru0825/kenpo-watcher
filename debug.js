@@ -37,6 +37,7 @@ puppeteer.use(StealthPlugin());
   await page.setUserAgent(UA);
   await page.setExtraHTTPHeaders({ 'Accept-Language': 'ja-JP,ja;q=0.9' });
 
+  /*
   // リソース制限（画像・CSS・フォントの読み込みを停止）
   await page.setRequestInterception(true);
   page.on('request', req => {
@@ -44,7 +45,8 @@ puppeteer.use(StealthPlugin());
     if (['image', 'stylesheet', 'font'].includes(type)) req.abort();
     else req.continue();
   });
-
+  */
+  
   page.on('console', msg => console.log('PAGE ▶', msg.type(), msg.text()));
   page.on('pageerror', err => console.error('PAGE ERROR ▶', err));
   page.on('requestfailed', req => console.warn('REQUEST FAILED ▶', req.url(), req.failure()));
