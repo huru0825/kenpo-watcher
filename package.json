@@ -5,10 +5,8 @@
     "postinstall": "npx puppeteer install chrome",
     "bundle": "esbuild index.js --bundle --platform=node --outdir=dist --external:filePath --external:t2.extends --external:path2",
     "build-binary": "pkg dist/index.js --targets node16-linux-x64 --output kenpo-watcher",
-    "start": "node server.js",
-    "debug": "node debug.js"
+    "start": "node server.js"
   },
-  "_comment": "debug スクリプトはデバッグ用です。不要になったら scripts.debug を削除してください。",
   "dependencies": {
     "axios": "^1.10.0",
     "express": "^4.18.2",
