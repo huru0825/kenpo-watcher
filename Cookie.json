@@ -1,0 +1,15 @@
+[
+  {
+    "name": "AWSALBTG",
+    "value": "セッション値",
+    "domain": "as.its-kenpo.or.jp",
+    "path": "/"
+  },
+  {
+    "name": "_ga",
+    "value": "GA1.1.xxx",
+    "domain": ".its-kenpo.or.jp",
+    "path": "/"
+  }
+  // 省略せずすべての固定Cookieをここに含めてください
+]
