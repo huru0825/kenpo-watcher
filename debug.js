@@ -76,4 +76,8 @@ module.exports.run = async function () {
     if (browserB) await browserB.close();
     isRunning = false;
   }
+}
+
+if (require.main === module) {
+  module.exports.run();
 };
