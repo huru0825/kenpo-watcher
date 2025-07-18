@@ -90,8 +90,14 @@ const fixedCookies = [
 ];
 
 async function waitCalendar(page) {
-  await page.waitForSelector('#calendarContent table.tb-calendar', { timeout: 120000 });
-  await page.waitForResponse(r => r.url().includes('/calendar_apply/calendar_select') && r.status() === 200);
+  console.log('→ カレンダー領域の検出待機…');
+  await page.waitForSelector('#calendarContent table.tb-calendar', { timeout: 180000 }); // タイムアウトを180秒に変更
+  console.log('→ カレンダー領域検出完了');
+  console.log('→ カレンダー取得XHR待機…');
+  await page.waitForResponse(r =>
+    r.url().includes('/calendar_apply/calendar_select') && r.status() === 200
+  );
+  console.log('→ カレンダーデータ取得完了');
 }
 
 async function visitMonth(page, includeDateFilter) {
