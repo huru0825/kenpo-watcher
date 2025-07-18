@@ -3,7 +3,6 @@ const { DATE_FILTER_LIST, DAY_FILTER, TARGET_DAY_RAW, TARGET_FACILITY_NAME } = r
 async function visitMonth(page, includeDateFilter) {
   console.log('[visitMonth] 実行開始');
 
-  // 最初のreCAPTCHA検出
   const anchor = await page.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout: 1000 }).catch(() => null);
   const challenge = await page.waitForSelector('iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect', { timeout: 1000 }).catch(() => null);
 
@@ -36,7 +35,15 @@ async function visitMonth(page, includeDateFilter) {
       console.log(`[visitMonth] 対象候補: "${label}" → 遷移検証`);
 
       await page.goto(href, { waitUntil: 'networkidle2', timeout: 0 });
-      await page.waitForFunction(() => document.querySelectorAll('.tb-calendar tbody td').length > 0, { timeout: 0 });
+
+      // 安定化のため waitForFunction → waitForSelector に変更＋補完
+      try {
+        await page.waitForSelector('.tb-calendar tbody td', { timeout: 10000 });
+        await page.waitForTimeout(1000);
+      } catch (e) {
+        console.warn(`[visitMonth] カレンダー描画待機失敗: ${label}`);
+        continue;
+      }
 
       const ia = await page.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout: 1000 }).catch(() => null);
       const ii = await page.waitForSelector('iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect', { timeout: 1000 }).catch(() => null);
@@ -45,6 +52,8 @@ async function visitMonth(page, includeDateFilter) {
         await page.goBack({ waitUntil: 'networkidle2' }).catch(() => {});
         continue;
       }
+
+      await page.waitForTimeout(1000); // DOM描画安定のため
 
       const found = await page.evaluate(name =>
         Array.from(document.querySelectorAll('a')).some(a => a.textContent.includes(name)), TARGET_FACILITY_NAME
