@@ -53,12 +53,12 @@ async function run() {
       console.log('[run] reCAPTCHA 検出 → チェックボックスクリック試行');
       await anchorFrame.click('.recaptcha-checkbox-border');
       await pageA.waitForTimeout(2000);
+      console.log('[run] reCAPTCHA 突破後、次へ遷移実行');
+      await nextMonth(pageA); // ← ここで明示的に遷移！
     } else {
-      console.log('[run] reCAPTCHA なし');
+      console.log('[run] reCAPTCHA なし → 初回遷移実行');
+      await nextMonth(pageA); // ← 通常ルート
     }
-
-    console.log('[run] 最初の nextMonth() 実行');
-    await nextMonth(pageA);
 
     const sequence = [
       { action: null,       includeDate: true },
