@@ -27,10 +27,15 @@ async function run() {
     console.log('[run] 実行開始');
 
     // A: 監視処理
+    console.log('[run] Puppeteer起動 (監視用ブラウザ)');
     browserA = await launchBrowser();
     const pageA = await browserA.newPage();
+
+    console.log('[run] ヘッダー・UA設定');
     await pageA.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/115.0.0.0 Safari/537.36');
     await pageA.setExtraHTTPHeaders({ 'Accept-Language': 'ja-JP,ja;q=0.9' });
+
+    console.log('[run] 固定Cookie注入');
     await pageA.setCookie(...fixedCookies);
 
     console.log('[run] 施設TOPページへアクセス');
@@ -42,6 +47,7 @@ async function run() {
       pageA.waitForSelector('#calendarContent', { timeout: 0 }).catch(() => {})
     ]);
 
+    console.log('[run] reCAPTCHA 検出チェック');
     const anchorFrame = pageA.frames().find(f => f.url().includes('/recaptcha/api2/anchor'));
     if (anchorFrame) {
       console.log('[run] reCAPTCHA 検出 → チェックボックスクリック試行');
@@ -94,11 +100,15 @@ async function run() {
     }
 
     // B: Cookie更新
-    console.log('[run] Cookie更新用ブラウザ起動');
+    console.log('[run] Puppeteer起動 (Cookie更新用ブラウザ)');
     browserB = await launchBrowser();
     const pageB = await browserB.newPage();
+
+    console.log('[run] ヘッダー・UA設定 (B)');
     await pageB.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/115.0.0.0 Safari/537.36');
     await pageB.setExtraHTTPHeaders({ 'Accept-Language': 'ja-JP,ja;q=0.9' });
+
+    console.log('[run] 固定Cookie注入 (B)');
     await pageB.setCookie(...fixedCookies);
 
     console.log('[run] Cookie更新ページ遷移');
