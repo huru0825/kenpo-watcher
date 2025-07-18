@@ -26,7 +26,6 @@ async function run() {
   try {
     console.log('[run] 実行開始');
 
-    // A: 監視処理
     console.log('[run] Puppeteer起動 (監視用ブラウザ)');
     browserA = await launchBrowser();
     const pageA = await browserA.newPage();
@@ -54,10 +53,10 @@ async function run() {
       await anchorFrame.click('.recaptcha-checkbox-border');
       await pageA.waitForTimeout(2000);
       console.log('[run] reCAPTCHA 突破後、次へ遷移実行');
-      await nextMonth(pageA); // ← ここで明示的に遷移！
+      await nextMonth(pageA);
     } else {
       console.log('[run] reCAPTCHA なし → 初回遷移実行');
-      await nextMonth(pageA); // ← 通常ルート
+      await nextMonth(pageA);
     }
 
     const sequence = [
@@ -102,7 +101,6 @@ async function run() {
     await browserA.close();
     browserA = null;
 
-    // B: Cookie更新（通知完了後に実行）
     console.log('[run] Puppeteer起動 (Cookie更新用ブラウザ)');
     browserB = await launchBrowser();
     const pageB = await browserB.newPage();
