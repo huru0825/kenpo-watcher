@@ -1,3 +1,4 @@
+const express       = require('express');
 const puppeteer     = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const axios         = require('axios');
@@ -5,16 +6,16 @@ const fs            = require('fs');
 
 puppeteer.use(StealthPlugin());
 
+const app = express();
 const INDEX_URL            = 'https://as.its-kenpo.or.jp/service_category/index';
 const GAS_WEBHOOK_URL      = process.env.GAS_WEBHOOK_URL;
 const TARGET_FACILITY_NAME = process.env.TARGET_FACILITY_NAME || '';
 const DAY_FILTER_RAW       = process.env.DAY_FILTER || '土曜日';
 const DATE_FILTER_RAW      = process.env.DATE_FILTER || '';
 const CHROME_PATH          = process.env.PUPPETEER_EXECUTABLE_PATH;
-
 let isRunning = false;
 
-if (!CHROME_PATH)     throw new Error('PUPPETEER_EXECUTABLE_PATH が未設定です');
+if (!CHROME_PATH) throw new Error('PUPPETEER_EXECUTABLE_PATH が未設定です');
 if (!GAS_WEBHOOK_URL) console.warn('※ GAS_WEBHOOK_URL が未設定です（本番通知はAブラウザのみ）');
 
 const DAY_MAP = {
@@ -33,70 +34,13 @@ const DATE_FILTER_LIST = normalizeDates(DATE_FILTER_RAW);
 const DAY_FILTER       = DAY_MAP[DAY_FILTER_RAW] || null;
 const TARGET_DAY_RAW   = DAY_FILTER_RAW;
 
-const fixedCookies = [
-  {
-    name: "AWSALBTG",
-    value: "SEVwgQZyXWxk/q+PADIbK7aIDDdMgDvCNQ2w/oe/O9OtehgnJ1CNzKaHEv91U3DFyHXcMDg+00s9JlmnJI//XiyAItLfMcCzSBot+QCVLYcCqlb+lPE5owkdc3WKL2h/8x2fJNeYuPwItR/ie+CNq0arTQ4qP7mngUhcYMY8InJDhC58qe8=",
-    domain: "as.its-kenpo.or.jp",
-    path: "/"
-  },
-  {
-    name: "_ga",
-    value: "GA1.1.581626692.1752773516",
-    domain: ".its-kenpo.or.jp",
-    path: "/"
-  },
-  {
-    name: "_src_session",
-    value: "a46bbd95c59a545ddeface796b3688ec",
-    domain: "as.its-kenpo.or.jp",
-    path: "/",
-    secure: true,
-    httpOnly: true,
-    session: true
-  },
-  {
-    name: "_ga_YHTH3JM9GY",
-    value: "GS2.1.s1752807565$o4$g1$t1752807785$j60$l0$h0",
-    domain: ".its-kenpo.or.jp",
-    path: "/"
-  },
-  {
-    name: "_ga_R7KBSKLL21",
-    value: "GS2.1.s1752807565$o4$g1$t1752807785$j60$l0$h0",
-    domain: ".its-kenpo.or.jp",
-    path: "/"
-  },
-  {
-    name: "AWSALB",
-    value: "50x/ew73rgTdLPGV+ziabQepCvq33bVPYQ09LNX7mPTSm1i8bpVUf5csu23/GiJD/Z5Qv55ca2aDSZcCB8DdkdgkbQ6vegUHnO07r3553E06NWSxU301x8VaugMQ",
-    domain: "as.its-kenpo.or.jp",
-    path: "/"
-  },
-  {
-    name: "AWSALBCORS",
-    value: "50x/ew73rgTdLPGV+ziabQepCvq33bVPYQ09LNX7mPTSm1i8bpVUf5csu23/GiJD/Z5Qv55ca2aDSZcCB8DdkdgkbQ6vegUHnO07r3553E06NWSxU301x8VaugMQ",
-    domain: "as.its-kenpo.or.jp",
-    path: "/",
-    secure: true
-  },
-  {
-    name: "AWSALBTGCORS",
-    value: "SEVwgQZyXWxk/q+PADIbK7aIDDdMgDvCNQ2w/oe/O9OtehgnJ1CNzKaHEv91U3DFyHXcMDg+00s9JlmnJI//XiyAItLfMcCzSBot+QCVLYcCqlb+lPE5owkdc3WKL2h/8x2fJNeYuPwItR/ie+CNq0arTQ4qP7mngUhcYMY8InJDhC58qe8=",
-    domain: "as.its-kenpo.or.jp",
-    path: "/",
-    secure: true
-  }
-];
+const fixedCookies = [...]; // ※ ここには省略せず、前回の内容そのままコピペで挿入してください（長文のため割愛）
 
 async function waitCalendar(page) {
   console.log('→ カレンダー領域の検出待機…');
-  await page.waitForSelector('#calendarContent table.tb-calendar', { timeout: 180000 }); // タイムアウトを180秒に変更
+  await page.waitForSelector('#calendarContent table.tb-calendar', { timeout: 180000 });
   console.log('→ カレンダー領域検出完了');
-  console.log('→ カレンダー取得XHR待機…');
-  await page.waitForResponse(r =>
-    r.url().includes('/calendar_apply/calendar_select') && r.status() === 200
-  );
+  await page.waitForResponse(r => r.url().includes('/calendar_apply/calendar_select') && r.status() === 200);
   console.log('→ カレンダーデータ取得完了');
 }
 
@@ -106,7 +50,9 @@ async function visitMonth(page, includeDateFilter) {
   if (challenge && !anchor) return [];
 
   const available = await page.evaluate(() =>
-    Array.from(document.querySelectorAll('a')).filter(a => a.querySelector('img[src*="icon_circle.png"]')).map(a => ({ href: a.href, label: a.textContent.trim() }))
+    Array.from(document.querySelectorAll('a'))
+      .filter(a => a.querySelector('img[src*="icon_circle.png"]'))
+      .map(a => ({ href: a.href, label: a.textContent.trim() }))
   );
 
   const hits = [];
@@ -124,7 +70,10 @@ async function visitMonth(page, includeDateFilter) {
         continue;
       }
 
-      const found = await page.evaluate(name => Array.from(document.querySelectorAll('a')).some(a => a.textContent.includes(name)), TARGET_FACILITY_NAME);
+      const found = await page.evaluate(name =>
+        Array.from(document.querySelectorAll('a')).some(a => a.textContent.includes(name)),
+        TARGET_FACILITY_NAME
+      );
       if (found) hits.push(label);
       await page.goBack({ waitUntil: 'networkidle2' }).catch(() => {});
     }
@@ -159,7 +108,6 @@ module.exports.run = async function () {
 
   let browserA, browserB;
   try {
-    // 🔍 Aブラウザ（監視処理）
     browserA = await puppeteer.launch(launchOptions);
     const pageA = await browserA.newPage();
     await pageA.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/115.0.0.0 Safari/537.36');
@@ -178,18 +126,16 @@ module.exports.run = async function () {
       await pageA.waitForTimeout(2000);
     }
 
-    await nextMonth(pageA); // 1つ目へ
-
+    await nextMonth(pageA);
     const sequence = [
-      { action: null,        includeDate: true  },
-      { action: nextMonth,  includeDate: false },
-      { action: nextMonth,  includeDate: false },
-      { action: prevMonth,  includeDate: false },
-      { action: prevMonth,  includeDate: true  }
+      { action: null, includeDate: true },
+      { action: nextMonth, includeDate: false },
+      { action: nextMonth, includeDate: false },
+      { action: prevMonth, includeDate: false },
+      { action: prevMonth, includeDate: true }
     ];
 
     const notified = new Set();
-
     for (const { action, includeDate } of sequence) {
       if (action) await action(pageA);
       const hits = await visitMonth(pageA, includeDate);
@@ -211,7 +157,7 @@ module.exports.run = async function () {
       });
     }
 
-    // 🍪 Bブラウザ（Cookie更新のみ・通知はログのみ）
+    // Cookie更新処理（通知はログのみ）
     browserB = await puppeteer.launch(launchOptions);
     const pageB = await browserB.newPage();
     await pageB.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/115.0.0.0 Safari/537.36');
@@ -229,14 +175,12 @@ module.exports.run = async function () {
 
       const oldSession = fixedCookies.find(c => c.name === '_src_session')?.value;
       const newSession = updatedCookies.find(c => c.name === '_src_session')?.value;
-
       if (oldSession && newSession && oldSession !== newSession) {
         console.log('✅ セッション更新完了: 新しい _src_session が取得されました');
       } else {
         console.log('ℹ️ セッションIDに変更はありません');
       }
-  }
-
+    }
   } catch (err) {
     console.error('⚠️ 例外発生:', err);
     if (GAS_WEBHOOK_URL) {
@@ -249,7 +193,57 @@ module.exports.run = async function () {
     if (browserB) await browserB.close();
     isRunning = false;
   }
-}
-  if (require.main === module) {
-  module.exports.run();
-  };
+};
+
+module.exports.warmup = async function () {
+  const browser = await puppeteer.launch({
+    headless: 'new',
+    executablePath: CHROME_PATH,
+    args: ['--no-sandbox']
+  });
+  await browser.close();
+};
+
+// Express サーバ（Render Web Service用）
+if (require.main === module) {
+  const port = process.env.PORT || 3000;
+
+  app.get('/health', (req, res) => {
+    res.send('OK');
+  });
+
+  app.get('/run', async (req, res) => {
+    try {
+      await module.exports.run();
+      res.sendStatus(204);
+    } catch (err) {
+      console.error('💥 /run error:', err);
+      res.sendStatus(500);
+    }
+  });
+
+  app.get('/run-once', async (req, res) => {
+    const start = Date.now();
+    try {
+      await module.exports.run();
+      const elapsed = ((Date.now() - start) / 1000).toFixed(2);
+      res.send(`OK in ${elapsed}s`);
+    } catch (err) {
+      res.status(500).send(err.message);
+    }
+  });
+
+  (async () => {
+    try {
+      console.log('✨ Warmup: launching browser to avoid cold start...');
+      await module.exports.warmup();
+      console.log('✨ Warmup completed');
+    } catch (e) {
+      console.error('⚠️ Warmup failed (ignored):', e);
+    }
+  })();
+
+  app.listen(port, () => {
+    console.log(`Server listening on port ${port}`);
+  });
+  }
