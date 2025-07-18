@@ -5,7 +5,7 @@ const { waitCalendar, nextMonth, prevMonth } = require('./modules/navigate');
 const { visitMonth } = require('./modules/visitMonth');
 const { sendNotification, sendNoVacancyNotice, sendErrorNotification } = require('./modules/notifier');
 const { updateCookiesIfValid } = require('./modules/cookieUpdater');
-const { INDEX_URL, GAS_WEBHOOK_URL, fixedCookies } = require('./modules/constants');
+const { INDEX_URL, fixedCookies } = require('./modules/constants');
 const { warmup } = require('./modules/warmup');
 
 puppeteer.use(StealthPlugin());
@@ -99,7 +99,10 @@ async function run() {
       await sendNoVacancyNotice();
     }
 
-    // B: Cookie更新
+    await browserA.close();
+    browserA = null;
+
+    // B: Cookie更新（通知完了後に実行）
     console.log('[run] Puppeteer起動 (Cookie更新用ブラウザ)');
     browserB = await launchBrowser();
     const pageB = await browserB.newPage();
