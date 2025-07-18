@@ -33,7 +33,61 @@ const DATE_FILTER_LIST = normalizeDates(DATE_FILTER_RAW);
 const DAY_FILTER       = DAY_MAP[DAY_FILTER_RAW] || null;
 const TARGET_DAY_RAW   = DAY_FILTER_RAW;
 
-const fixedCookies = [/* 省略せず実際の固定Cookieを貼る（省略時は updated_cookies.json 読み込みでも可） */];
+const fixedCookies = [
+  {
+    name: "AWSALBTG",
+    value: "SEVwgQZyXWxk/q+PADIbK7aIDDdMgDvCNQ2w/oe/O9OtehgnJ1CNzKaHEv91U3DFyHXcMDg+00s9JlmnJI//XiyAItLfMcCzSBot+QCVLYcCqlb+lPE5owkdc3WKL2h/8x2fJNeYuPwItR/ie+CNq0arTQ4qP7mngUhcYMY8InJDhC58qe8=",
+    domain: "as.its-kenpo.or.jp",
+    path: "/"
+  },
+  {
+    name: "_ga",
+    value: "GA1.1.581626692.1752773516",
+    domain: ".its-kenpo.or.jp",
+    path: "/"
+  },
+  {
+    name: "_src_session",
+    value: "a46bbd95c59a545ddeface796b3688ec",
+    domain: "as.its-kenpo.or.jp",
+    path: "/",
+    secure: true,
+    httpOnly: true,
+    session: true
+  },
+  {
+    name: "_ga_YHTH3JM9GY",
+    value: "GS2.1.s1752807565$o4$g1$t1752807785$j60$l0$h0",
+    domain: ".its-kenpo.or.jp",
+    path: "/"
+  },
+  {
+    name: "_ga_R7KBSKLL21",
+    value: "GS2.1.s1752807565$o4$g1$t1752807785$j60$l0$h0",
+    domain: ".its-kenpo.or.jp",
+    path: "/"
+  },
+  {
+    name: "AWSALB",
+    value: "50x/ew73rgTdLPGV+ziabQepCvq33bVPYQ09LNX7mPTSm1i8bpVUf5csu23/GiJD/Z5Qv55ca2aDSZcCB8DdkdgkbQ6vegUHnO07r3553E06NWSxU301x8VaugMQ",
+    domain: "as.its-kenpo.or.jp",
+    path: "/"
+  },
+  {
+    name: "AWSALBCORS",
+    value: "50x/ew73rgTdLPGV+ziabQepCvq33bVPYQ09LNX7mPTSm1i8bpVUf5csu23/GiJD/Z5Qv55ca2aDSZcCB8DdkdgkbQ6vegUHnO07r3553E06NWSxU301x8VaugMQ",
+    domain: "as.its-kenpo.or.jp",
+    path: "/",
+    secure: true
+  },
+  {
+    name: "AWSALBTGCORS",
+    value: "SEVwgQZyXWxk/q+PADIbK7aIDDdMgDvCNQ2w/oe/O9OtehgnJ1CNzKaHEv91U3DFyHXcMDg+00s9JlmnJI//XiyAItLfMcCzSBot+QCVLYcCqlb+lPE5owkdc3WKL2h/8x2fJNeYuPwItR/ie+CNq0arTQ4qP7mngUhcYMY8InJDhC58qe8=",
+    domain: "as.its-kenpo.or.jp",
+    path: "/",
+    secure: true
+  }
+];
 
 async function waitCalendar(page) {
   await page.waitForSelector('#calendarContent table.tb-calendar', { timeout: 120000 });
@@ -166,7 +220,16 @@ module.exports.run = async function () {
       const updatedCookies = await pageB.cookies();
       fs.writeFileSync('updated_cookies.json', JSON.stringify(updatedCookies, null, 2), 'utf-8');
       console.log('💾 Cookie保存完了: updated_cookies.json');
-    }
+
+      const oldSession = fixedCookies.find(c => c.name === '_src_session')?.value;
+      const newSession = updatedCookies.find(c => c.name === '_src_session')?.value;
+
+      if (oldSession && newSession && oldSession !== newSession) {
+        console.log('✅ セッション更新完了: 新しい _src_session が取得されました');
+      } else {
+        console.log('ℹ️ セッションIDに変更はありません');
+      }
+  }
 
   } catch (err) {
     console.error('⚠️ 例外発生:', err);
@@ -180,4 +243,7 @@ module.exports.run = async function () {
     if (browserB) await browserB.close();
     isRunning = false;
   }
-};
+}
+  if (require.main === module) {
+  module.exports.run();
+  };
