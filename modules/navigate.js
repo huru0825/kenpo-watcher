@@ -10,19 +10,26 @@ async function waitCalendar(page) {
     throw err;
   }
 
-  await page.waitForResponse(r =>
-    r.url().includes('/calendar_apply/calendar_select') && r.status() === 200
-  );
   console.log('✅ カレンダーデータ取得完了');
 }
 
 async function nextMonth(page) {
-  await page.click('input.button-select.button-primary[value="次へ"]');
+  await Promise.all([
+    page.waitForResponse(r =>
+      r.url().includes('/calendar_apply/calendar_select') && r.status() === 200
+    ),
+    page.click('input.button-select.button-primary[value="次へ"]')
+  ]);
   await waitCalendar(page);
 }
 
 async function prevMonth(page) {
-  await page.click('input.button-select.button-primary[value="前へ"]');
+  await Promise.all([
+    page.waitForResponse(r =>
+      r.url().includes('/calendar_apply/calendar_select') && r.status() === 200
+    ),
+    page.click('input.button-select.button-primary[value="前へ"]')
+  ]);
   await waitCalendar(page);
 }
 
