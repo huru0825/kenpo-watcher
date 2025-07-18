@@ -1,7 +1,7 @@
 [
   {
     "name": "AWSALBTG",
-    "value": "BJqLbbXf3uJjnOynzH7dv46D/i1D6Yfb0EyLhOSMMAUMUV1SbZxCKmIc+gtHt07PK+faMMEWn2Ss0HXjQFXaPWh8BQ+4uXS3pZuXwB9R09ausZNhOWXtpfphbxlE/Jy0SZaOVAveVd9hYA8KnhkEvn6Yv9EdDk0enK+FrY+DNA10orgp8Eg=",
+    "value": "dESZvaxIPb6Rukq6LS72i6VYHNu+XzcSOly5l8Wm/HpVmOE0SNoDULugiKYgPuYwgExK2NO2VJHBvJVRLLLdFj42VyWPdm4qbrtOVNrihI0s7o7nfkXUf9jC52sVT8iZ6kxOK08NFPDYwbaQTQj/6QQ+eA4lZPmHzjDshOtjQ8G6rUW0r5Q=",
     "domain": "as.its-kenpo.or.jp",
     "hostOnly": true,
     "path": "/",
@@ -10,9 +10,7 @@
     "sameSite": "no_restriction",
     "session": false,
     "firstPartyDomain": "",
-    "partitionKey": null,
-    "expirationDate": 1753451942,
-    "storeId": null
+    "expirationDate": 1753453339
   },
   {
     "name": "_ga",
@@ -25,13 +23,11 @@
     "sameSite": "no_restriction",
     "session": false,
     "firstPartyDomain": "",
-    "partitionKey": null,
-    "expirationDate": 1815845516,
-    "storeId": null
+    "expirationDate": 1815845516
   },
   {
     "name": "_src_session",
-    "value": "f53c89407ced17151c23bb70ac2b8b39",
+    "value": "d78290104e55f5a4ec14020ec625563d",
     "domain": "as.its-kenpo.or.jp",
     "hostOnly": true,
     "path": "/",
@@ -39,13 +35,11 @@
     "httpOnly": true,
     "sameSite": "no_restriction",
     "session": true,
-    "firstPartyDomain": "",
-    "partitionKey": null,
-    "storeId": null
+    "firstPartyDomain": ""
   },
   {
     "name": "_ga_YHTH3JM9GY",
-    "value": "GS2.1.s1752847125$o5$g0$t1752847125$j60$l0$h0",
+    "value": "GS2.1.s1752847125$o5$g1$t1752848457$j60$l0$h0",
     "domain": ".its-kenpo.or.jp",
     "hostOnly": false,
     "path": "/",
@@ -54,13 +48,11 @@
     "sameSite": "no_restriction",
     "session": false,
     "firstPartyDomain": "",
-    "partitionKey": null,
-    "expirationDate": 1815919125,
-    "storeId": null
+    "expirationDate": 1815920457
   },
   {
     "name": "_ga_R7KBSKLL21",
-    "value": "GS2.1.s1752847125$o5$g0$t1752847125$j60$l0$h0",
+    "value": "GS2.1.s1752847125$o5$g1$t1752848457$j60$l0$h0",
     "domain": ".its-kenpo.or.jp",
     "hostOnly": false,
     "path": "/",
@@ -69,13 +61,11 @@
     "sameSite": "no_restriction",
     "session": false,
     "firstPartyDomain": "",
-    "partitionKey": null,
-    "expirationDate": 1815919125,
-    "storeId": null
+    "expirationDate": 1815920457
   },
   {
     "name": "AWSALB",
-    "value": "iJjXNm1Rc1qVVnP5610K3rz+wDq7buEKJuC0M3AQv7tWzIn2Y4m3BcWRtIPlUbkKIv6kq+LUKHByONZH3ij+ZPCMRkr2naf3JjRaPbAwpaB51W4pbwc95MZnaHhj",
+    "value": "fuiNdUAS4C/rKnDSfn8oQbSXyEf3GbvH/M5YHG5kP8pXFqdRNnwY7HtJRPlQGwisBxnLXw+SpZ/ki5AQ9wKHHilRPJERdExvDIWOjWDWlCoUjKDczcYjgE4I9Gqq",
     "domain": "as.its-kenpo.or.jp",
     "hostOnly": true,
     "path": "/",
@@ -84,13 +74,11 @@
     "sameSite": "no_restriction",
     "session": false,
     "firstPartyDomain": "",
-    "partitionKey": null,
-    "expirationDate": 1753451942,
-    "storeId": null
+    "expirationDate": 1753453339
   },
   {
     "name": "AWSALBCORS",
-    "value": "iJjXNm1Rc1qVVnP5610K3rz+wDq7buEKJuC0M3AQv7tWzIn2Y4m3BcWRtIPlUbkKIv6kq+LUKHByONZH3ij+ZPCMRkr2naf3JjRaPbAwpaB51W4pbwc95MZnaHhj",
+    "value": "fuiNdUAS4C/rKnDSfn8oQbSXyEf3GbvH/M5YHG5kP8pXFqdRNnwY7HtJRPlQGwisBxnLXw+SpZ/ki5AQ9wKHHilRPJERdExvDIWOjWDWlCoUjKDczcYjgE4I9Gqq",
     "domain": "as.its-kenpo.or.jp",
     "hostOnly": true,
     "path": "/",
@@ -99,13 +87,11 @@
     "sameSite": "no_restriction",
     "session": false,
     "firstPartyDomain": "",
-    "partitionKey": null,
-    "expirationDate": 1753451942,
-    "storeId": null
+    "expirationDate": 1753453339
   },
   {
     "name": "AWSALBTGCORS",
-    "value": "BJqLbbXf3uJjnOynzH7dv46D/i1D6Yfb0EyLhOSMMAUMUV1SbZxCKmIc+gtHt07PK+faMMEWn2Ss0HXjQFXaPWh8BQ+4uXS3pZuXwB9R09ausZNhOWXtpfphbxlE/Jy0SZaOVAveVd9hYA8KnhkEvn6Yv9EdDk0enK+FrY+DNA10orgp8Eg=",
+    "value": "dESZvaxIPb6Rukq6LS72i6VYHNu+XzcSOly5l8Wm/HpVmOE0SNoDULugiKYgPuYwgExK2NO2VJHBvJVRLLLdFj42VyWPdm4qbrtOVNrihI0s7o7nfkXUf9jC52sVT8iZ6kxOK08NFPDYwbaQTQj/6QQ+eA4lZPmHzjDshOtjQ8G6rUW0r5Q=",
     "domain": "as.its-kenpo.or.jp",
     "hostOnly": true,
     "path": "/",
@@ -114,8 +100,6 @@
     "sameSite": "no_restriction",
     "session": false,
     "firstPartyDomain": "",
-    "partitionKey": null,
-    "expirationDate": 1753451942,
-    "storeId": null
+    "expirationDate": 1753453339
   }
 ]
