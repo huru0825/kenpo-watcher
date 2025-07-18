@@ -8,6 +8,8 @@ puppeteer.use(StealthPlugin());
 const INDEX_URL            = 'https://as.its-kenpo.or.jp/service_category/index';
 const GAS_WEBHOOK_URL      = process.env.GAS_WEBHOOK_URL;
 const TARGET_FACILITY_NAME = process.env.TARGET_FACILITY_NAME || '';
+const DAY_FILTER_RAW       = process.env.DAY_FILTER || '土曜日';
+const DATE_FILTER_RAW      = process.env.DATE_FILTER || '';
 const CHROME_PATH          = process.env.PUPPETEER_EXECUTABLE_PATH;
 
 let isRunning = false;
@@ -15,16 +17,70 @@ let isRunning = false;
 if (!CHROME_PATH)     throw new Error('PUPPETEER_EXECUTABLE_PATH が未設定です');
 if (!GAS_WEBHOOK_URL) console.warn('※ GAS_WEBHOOK_URL が未設定です（本番通知はAブラウザのみ）');
 
-const fixedCookies = [
-  { name: 'AWSALBTG', value: 'ggKYGeug3qPUPf5LB3rDc3IfKTOdNFyJHN6wLJKOZ5ikvhqa3xpMElRBAubX3t9r+TcZoTQe9zfnajmesKytasd+I/ll/bXZ7mtZbXbcd8mHNPM3Oq/narjOh8iYnL7rS49Ii7F7fgzv5CGChwXUhR6L3A4Zi33AOvB+nJHKAN+l1TYlcp4=', domain: 'as.its-kenpo.or.jp', path: '/', sameSite: 'no_restriction', secure: false, httpOnly: false, session: false },
-  { name: '_ga', value: 'GA1.1.581626692.1752773516', domain: '.its-kenpo.or.jp', path: '/', sameSite: 'no_restriction', secure: false, httpOnly: false, session: false },
-  { name: '_src_session', value: '7a494990d8e0787ea2685d834b4c11c9', domain: 'as.its-kenpo.or.jp', path: '/', sameSite: 'no_restriction', secure: true, httpOnly: true, session: true },
-  { name: '_ga_YHTH3JM9GY', value: 'GS2.1.s1752801973$o3$g1$t1752803331$j41$l0$h0', domain: '.its-kenpo.or.jp', path: '/', sameSite: 'no_restriction', secure: false, httpOnly: false, session: false },
-  { name: '_ga_R7KBSKLL21', value: 'GS2.1.s1752801973$o3$g1$t1752803331$j41$l0$h0', domain: '.its-kenpo.or.jp', path: '/', sameSite: 'no_restriction', secure: false, httpOnly: false, session: false },
-  { name: 'AWSALB', value: 'o/cA46FL5Xtgr7L1pBUnF0UnKq/SDFrwFAh2xaTyg0jrp3gb3kOztRJN8ZnIJrftBN2BZ9b3vamXjJA2PhAsmIahgJV5V+05maZMBkHtjnD1bhDn91ZoNZ2MUitM', domain: 'as.its-kenpo.or.jp', path: '/', sameSite: 'no_restriction', secure: false, httpOnly: false, session: false },
-  { name: 'AWSALBCORS', value: 'o/cA46FL5Xtgr7L1pBUnF0UnKq/SDFrwFAh2xaTyg0jrp3gb3kOztRJN8ZnIJrftBN2BZ9b3vamXjJA2PhAsmIahgJV5V+05maZMBkHtjnD1bhDn91ZoNZ2MUitM', domain: 'as.its-kenpo.or.jp', path: '/', sameSite: 'no_restriction', secure: true, httpOnly: false, session: false },
-  { name: 'AWSALBTGCORS', value: 'ggKYGeug3qPUPf5LB3rDc3IfKTOdNFyJHN6wLJKOZ5ikvhqa3xpMElRBAubX3t9r+TcZoTQe9zfnajmesKytasd+I/ll/bXZ7mtZbXbcd8mHNPM3Oq/narjOh8iYnL7rS49Ii7F7fgzv5CGChwXUhR6L3A4Zi33AOvB+nJHKAN+l1TYlcp4=', domain: 'as.its-kenpo.or.jp', path: '/', sameSite: 'no_restriction', secure: true, httpOnly: false, session: false }
-];
+const DAY_MAP = {
+  '日曜日': 'Sunday', '月曜日': 'Monday', '火曜日': 'Tuesday',
+  '水曜日': 'Wednesday', '木曜日': 'Thursday', '金曜日': 'Friday', '土曜日': 'Saturday'
+};
+
+function normalizeDates(raw) {
+  return raw.replace(/、/g, ',').split(',').map(d => d.trim()).filter(Boolean).map(date => {
+    const m = date.match(/^(\d{1,2})月(\d{1,2})日$/);
+    return m ? m[1].padStart(2, '0') + '月' + m[2].padStart(2, '0') + '日' : null;
+  }).filter(Boolean);
+}
+
+const DATE_FILTER_LIST = normalizeDates(DATE_FILTER_RAW);
+const DAY_FILTER       = DAY_MAP[DAY_FILTER_RAW] || null;
+const TARGET_DAY_RAW   = DAY_FILTER_RAW;
+
+const fixedCookies = [/* 省略せず実際の固定Cookieを貼る（省略時は updated_cookies.json 読み込みでも可） */];
+
+async function waitCalendar(page) {
+  await page.waitForSelector('#calendarContent table.tb-calendar', { timeout: 120000 });
+  await page.waitForResponse(r => r.url().includes('/calendar_apply/calendar_select') && r.status() === 200);
+}
+
+async function visitMonth(page, includeDateFilter) {
+  const anchor = await page.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout: 1000 }).catch(() => null);
+  const challenge = await page.waitForSelector('iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect', { timeout: 1000 }).catch(() => null);
+  if (challenge && !anchor) return [];
+
+  const available = await page.evaluate(() =>
+    Array.from(document.querySelectorAll('a')).filter(a => a.querySelector('img[src*="icon_circle.png"]')).map(a => ({ href: a.href, label: a.textContent.trim() }))
+  );
+
+  const hits = [];
+  for (const { href, label } of available) {
+    const byDate = includeDateFilter && DATE_FILTER_LIST.some(d => label.includes(d));
+    const byDay = !DATE_FILTER_LIST.length && DAY_FILTER && label.includes(TARGET_DAY_RAW);
+    if (byDate || byDay) {
+      await page.goto(href, { waitUntil: 'networkidle2', timeout: 0 });
+      await page.waitForFunction(() => document.querySelectorAll('.tb-calendar tbody td').length > 0, { timeout: 0 });
+
+      const ia = await page.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout: 1000 }).catch(() => null);
+      const ii = await page.waitForSelector('iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect', { timeout: 1000 }).catch(() => null);
+      if (ii && !ia) {
+        await page.goBack({ waitUntil: 'networkidle2' }).catch(() => {});
+        continue;
+      }
+
+      const found = await page.evaluate(name => Array.from(document.querySelectorAll('a')).some(a => a.textContent.includes(name)), TARGET_FACILITY_NAME);
+      if (found) hits.push(label);
+      await page.goBack({ waitUntil: 'networkidle2' }).catch(() => {});
+    }
+  }
+  return hits;
+}
+
+async function nextMonth(page) {
+  await page.click('input.button-select.button-primary[value="次へ"]');
+  await waitCalendar(page);
+}
+
+async function prevMonth(page) {
+  await page.click('input.button-select.button-primary[value="前へ"]');
+  await waitCalendar(page);
+}
 
 module.exports.run = async function () {
   if (isRunning) return;
@@ -33,21 +89,69 @@ module.exports.run = async function () {
   const launchOptions = {
     headless: 'new',
     executablePath: CHROME_PATH,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security', '--disable-blink-features=AutomationControlled']
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-web-security',
+      '--disable-blink-features=AutomationControlled'
+    ]
   };
 
   let browserA, browserB;
   try {
-    console.log('🅰️ Aブラウザ 起動');
+    // 🔍 Aブラウザ（監視処理）
     browserA = await puppeteer.launch(launchOptions);
     const pageA = await browserA.newPage();
     await pageA.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/115.0.0.0 Safari/537.36');
     await pageA.setExtraHTTPHeaders({ 'Accept-Language': 'ja-JP,ja;q=0.9' });
     await pageA.setCookie(...fixedCookies);
     await pageA.goto(INDEX_URL, { waitUntil: 'networkidle2', timeout: 0 });
-    console.log('🅰️ Aブラウザ処理完了');
 
-    console.log('🆕 Bブラウザ 起動（Cookie更新）');
+    await Promise.all([
+      pageA.click('a[href*="/calendar_apply"]'),
+      pageA.waitForSelector('#calendarContent', { timeout: 0 }).catch(() => {})
+    ]);
+
+    const anchorFrame = pageA.frames().find(f => f.url().includes('/recaptcha/api2/anchor'));
+    if (anchorFrame) {
+      await anchorFrame.click('.recaptcha-checkbox-border');
+      await pageA.waitForTimeout(2000);
+    }
+
+    await nextMonth(pageA); // 1つ目へ
+
+    const sequence = [
+      { action: null,        includeDate: true  },
+      { action: nextMonth,  includeDate: false },
+      { action: nextMonth,  includeDate: false },
+      { action: prevMonth,  includeDate: false },
+      { action: prevMonth,  includeDate: true  }
+    ];
+
+    const notified = new Set();
+
+    for (const { action, includeDate } of sequence) {
+      if (action) await action(pageA);
+      const hits = await visitMonth(pageA, includeDate);
+      for (const label of hits) {
+        if (!notified.has(label)) {
+          notified.add(label);
+          if (GAS_WEBHOOK_URL) {
+            await axios.post(GAS_WEBHOOK_URL, {
+              message: `【${TARGET_FACILITY_NAME}】予約状況更新\n日付：${label}\n詳細▶︎${INDEX_URL}`
+            });
+          }
+        }
+      }
+    }
+
+    if (notified.size === 0 && GAS_WEBHOOK_URL) {
+      await axios.post(GAS_WEBHOOK_URL, {
+        message: `ℹ️ ${TARGET_FACILITY_NAME} の空きはありませんでした。\n監視URL▶︎${INDEX_URL}`
+      });
+    }
+
+    // 🍪 Bブラウザ（Cookie更新のみ・通知はログのみ）
     browserB = await puppeteer.launch(launchOptions);
     const pageB = await browserB.newPage();
     await pageB.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/115.0.0.0 Safari/537.36');
@@ -61,11 +165,11 @@ module.exports.run = async function () {
     } else {
       const updatedCookies = await pageB.cookies();
       fs.writeFileSync('updated_cookies.json', JSON.stringify(updatedCookies, null, 2), 'utf-8');
-      console.log('✅ Bブラウザ: Cookie保存完了 (updated_cookies.json)');
+      console.log('💾 Cookie保存完了: updated_cookies.json');
     }
 
   } catch (err) {
-    console.error('⚠️ エラー発生:', err);
+    console.error('⚠️ 例外発生:', err);
     if (GAS_WEBHOOK_URL) {
       await axios.post(GAS_WEBHOOK_URL, {
         message: '⚠️ エラーが発生しました：\n' + (err.stack || err.message)
@@ -76,8 +180,4 @@ module.exports.run = async function () {
     if (browserB) await browserB.close();
     isRunning = false;
   }
-}
-
-if (require.main === module) {
-  module.exports.run();
 };
