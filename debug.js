@@ -16,14 +16,14 @@ if (!CHROME_PATH)     throw new Error('PUPPETEER_EXECUTABLE_PATH が未設定で
 if (!GAS_WEBHOOK_URL) console.warn('※ GAS_WEBHOOK_URL が未設定です（本番通知はAブラウザのみ）');
 
 const fixedCookies = [
-  { name: 'AWSALBTG', value: 'UOUwuWcvE30QX0Dp2UZz02Hqo1xmq2IdFwVQmJKSnKLUmqiMWq4VJU4laPL96Zp8fgN43NLOtBb2knWFvgFZ0fsJtnFUZWFaCZP9BbczzSAMwUDdEiTRqaqy3tS/KbMuKpSouoIqNLGXuu1CCdrUiy3IykCsn86NEQ/SgYdTsQoQIwX8UBQ=', domain: 'as.its-kenpo.or.jp', path: '/', sameSite: 'no_restriction', secure: false, httpOnly: false, session: false },
+  { name: 'AWSALBTG', value: 'ggKYGeug3qPUPf5LB3rDc3IfKTOdNFyJHN6wLJKOZ5ikvhqa3xpMElRBAubX3t9r+TcZoTQe9zfnajmesKytasd+I/ll/bXZ7mtZbXbcd8mHNPM3Oq/narjOh8iYnL7rS49Ii7F7fgzv5CGChwXUhR6L3A4Zi33AOvB+nJHKAN+l1TYlcp4=', domain: 'as.its-kenpo.or.jp', path: '/', sameSite: 'no_restriction', secure: false, httpOnly: false, session: false },
   { name: '_ga', value: 'GA1.1.581626692.1752773516', domain: '.its-kenpo.or.jp', path: '/', sameSite: 'no_restriction', secure: false, httpOnly: false, session: false },
-  { name: '_src_session', value: 'ba8771f87cf957b44180d6a26f34e3c9', domain: 'as.its-kenpo.or.jp', path: '/', sameSite: 'no_restriction', secure: true, httpOnly: true, session: true },
-  { name: '_ga_YHTH3JM9GY', value: 'GS2.1.s1752801973$o3$g1$t1752801986$j47$l0$h0', domain: '.its-kenpo.or.jp', path: '/', sameSite: 'no_restriction', secure: false, httpOnly: false, session: false },
-  { name: '_ga_R7KBSKLL21', value: 'GS2.1.s1752801973$o3$g1$t1752801986$j47$l0$h0', domain: '.its-kenpo.or.jp', path: '/', sameSite: 'no_restriction', secure: false, httpOnly: false, session: false },
-  { name: 'AWSALB', value: 'TsV6zFyXZ+KXdjtTbbEruWkMs8rG8tMrwoZ/R3iOtzXFW/X333ldHzyMM5Q9EG0EsvjNQitCtPrGaoG6I4zyXrFnJRRsi4jpfbvOKxcJEnpZfVtaKpCJXs66iMQM', domain: 'as.its-kenpo.or.jp', path: '/', sameSite: 'no_restriction', secure: false, httpOnly: false, session: false },
-  { name: 'AWSALBCORS', value: 'TsV6zFyXZ+KXdjtTbbEruWkMs8rG8tMrwoZ/R3iOtzXFW/X333ldHzyMM5Q9EG0EsvjNQitCtPrGaoG6I4zyXrFnJRRsi4jpfbvOKxcJEnpZfVtaKpCJXs66iMQM', domain: 'as.its-kenpo.or.jp', path: '/', sameSite: 'no_restriction', secure: true, httpOnly: false, session: false },
-  { name: 'AWSALBTGCORS', value: 'UOUwuWcvE30QX0Dp2UZz02Hqo1xmq2IdFwVQmJKSnKLUmqiMWq4VJU4laPL96Zp8fgN43NLOtBb2knWFvgFZ0fsJtnFUZWFaCZP9BbczzSAMwUDdEiTRqaqy3tS/KbMuKpSouoIqNLGXuu1CCdrUiy3IykCsn86NEQ/SgYdTsQoQIwX8UBQ=', domain: 'as.its-kenpo.or.jp', path: '/', sameSite: 'no_restriction', secure: true, httpOnly: false, session: false }
+  { name: '_src_session', value: '7a494990d8e0787ea2685d834b4c11c9', domain: 'as.its-kenpo.or.jp', path: '/', sameSite: 'no_restriction', secure: true, httpOnly: true, session: true },
+  { name: '_ga_YHTH3JM9GY', value: 'GS2.1.s1752801973$o3$g1$t1752803331$j41$l0$h0', domain: '.its-kenpo.or.jp', path: '/', sameSite: 'no_restriction', secure: false, httpOnly: false, session: false },
+  { name: '_ga_R7KBSKLL21', value: 'GS2.1.s1752801973$o3$g1$t1752803331$j41$l0$h0', domain: '.its-kenpo.or.jp', path: '/', sameSite: 'no_restriction', secure: false, httpOnly: false, session: false },
+  { name: 'AWSALB', value: 'o/cA46FL5Xtgr7L1pBUnF0UnKq/SDFrwFAh2xaTyg0jrp3gb3kOztRJN8ZnIJrftBN2BZ9b3vamXjJA2PhAsmIahgJV5V+05maZMBkHtjnD1bhDn91ZoNZ2MUitM', domain: 'as.its-kenpo.or.jp', path: '/', sameSite: 'no_restriction', secure: false, httpOnly: false, session: false },
+  { name: 'AWSALBCORS', value: 'o/cA46FL5Xtgr7L1pBUnF0UnKq/SDFrwFAh2xaTyg0jrp3gb3kOztRJN8ZnIJrftBN2BZ9b3vamXjJA2PhAsmIahgJV5V+05maZMBkHtjnD1bhDn91ZoNZ2MUitM', domain: 'as.its-kenpo.or.jp', path: '/', sameSite: 'no_restriction', secure: true, httpOnly: false, session: false },
+  { name: 'AWSALBTGCORS', value: 'ggKYGeug3qPUPf5LB3rDc3IfKTOdNFyJHN6wLJKOZ5ikvhqa3xpMElRBAubX3t9r+TcZoTQe9zfnajmesKytasd+I/ll/bXZ7mtZbXbcd8mHNPM3Oq/narjOh8iYnL7rS49Ii7F7fgzv5CGChwXUhR6L3A4Zi33AOvB+nJHKAN+l1TYlcp4=', domain: 'as.its-kenpo.or.jp', path: '/', sameSite: 'no_restriction', secure: true, httpOnly: false, session: false }
 ];
 
 module.exports.run = async function () {
@@ -38,7 +38,6 @@ module.exports.run = async function () {
 
   let browserA, browserB;
   try {
-    // === Aブラウザ ===
     console.log('🅰️ Aブラウザ 起動');
     browserA = await puppeteer.launch(launchOptions);
     const pageA = await browserA.newPage();
@@ -48,7 +47,6 @@ module.exports.run = async function () {
     await pageA.goto(INDEX_URL, { waitUntil: 'networkidle2', timeout: 0 });
     console.log('🅰️ Aブラウザ処理完了');
 
-    // === Bブラウザ ===
     console.log('🆕 Bブラウザ 起動（Cookie更新）');
     browserB = await puppeteer.launch(launchOptions);
     const pageB = await browserB.newPage();
