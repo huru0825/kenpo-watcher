@@ -24,6 +24,8 @@ async function run() {
   let browserA, browserB;
 
   try {
+    console.log('[run] 実行開始');
+
     // A: 監視処理
     browserA = await launchBrowser();
     const pageA = await browserA.newPage();
@@ -31,7 +33,10 @@ async function run() {
     await pageA.setExtraHTTPHeaders({ 'Accept-Language': 'ja-JP,ja;q=0.9' });
     await pageA.setCookie(...fixedCookies);
 
+    console.log('[run] 施設TOPページへアクセス');
     await pageA.goto(INDEX_URL, { waitUntil: 'networkidle2', timeout: 0 });
+
+    console.log('[run] カレンダーリンククリック＆読み込み待機');
     await Promise.all([
       pageA.click('a[href*="/calendar_apply"]'),
       pageA.waitForSelector('#calendarContent', { timeout: 0 }).catch(() => {})
@@ -39,10 +44,14 @@ async function run() {
 
     const anchorFrame = pageA.frames().find(f => f.url().includes('/recaptcha/api2/anchor'));
     if (anchorFrame) {
+      console.log('[run] reCAPTCHA 検出 → チェックボックスクリック試行');
       await anchorFrame.click('.recaptcha-checkbox-border');
       await pageA.waitForTimeout(2000);
+    } else {
+      console.log('[run] reCAPTCHA なし');
     }
 
+    console.log('[run] 最初の nextMonth() 実行');
     await nextMonth(pageA);
 
     const sequence = [
@@ -56,28 +65,49 @@ async function run() {
     const notified = new Set();
 
     for (const { action, includeDate } of sequence) {
-      if (action) await action(pageA);
+      if (action) {
+        console.log(`[run] ${action.name} 実行`);
+        await action(pageA);
+      }
+
+      console.log(`[run] visitMonth(includeDate=${includeDate}) 実行`);
       const hits = await visitMonth(pageA, includeDate);
+
+      if (hits.length > 0) {
+        console.log(`[run] 空き検出: ${hits.join(', ')}`);
+      } else {
+        console.log('[run] 空きなし');
+      }
+
       for (const label of hits) {
         if (!notified.has(label)) {
           notified.add(label);
+          console.log(`[run] 通知: ${label}`);
           await sendNotification(label);
         }
       }
     }
 
     if (notified.size === 0) {
+      console.log('[run] 空きなし通知を送信');
       await sendNoVacancyNotice();
     }
 
     // B: Cookie更新
+    console.log('[run] Cookie更新用ブラウザ起動');
     browserB = await launchBrowser();
     const pageB = await browserB.newPage();
     await pageB.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/115.0.0.0 Safari/537.36');
     await pageB.setExtraHTTPHeaders({ 'Accept-Language': 'ja-JP,ja;q=0.9' });
     await pageB.setCookie(...fixedCookies);
+
+    console.log('[run] Cookie更新ページ遷移');
     await pageB.goto(INDEX_URL, { waitUntil: 'networkidle2', timeout: 0 });
+
+    console.log('[run] Cookie更新処理へ');
     await updateCookiesIfValid(pageB);
+
+    console.log('[run] 全処理完了');
 
   } catch (err) {
     console.error('⚠️ 例外発生:', err);
