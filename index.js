@@ -10,6 +10,11 @@ const { warmup } = require('./modules/warmup');
 
 puppeteer.use(StealthPlugin());
 
+let sharedContext = {};
+function setSharedContext(context) {
+  sharedContext = context;
+}
+
 let isRunning = false;
 
 async function run() {
@@ -84,4 +89,4 @@ async function run() {
   }
 }
 
-module.exports = { run, warmup };
+module.exports = { run, warmup, setSharedContext };
