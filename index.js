@@ -57,12 +57,18 @@ async function run() {
       f.url().includes('/recaptcha/api2/anchor')
     );
     if (anchorFrame) {
-      console.log('[run] reCAPTCHA検出 → チェックボックスクリック');
-      await anchorFrame.click('.recaptcha-checkbox-border');
+      const checkbox = await anchorFrame.waitForSelector(
+        '.recaptcha-checkbox-border', { timeout: 10000 }
+      ).catch(() => null);
+      if (checkbox) {
+        await checkbox.click();
+        console.log('[run] reCAPTCHAチェックボックスクリック成功')
+      } else {
+        console.warn('⚠️ recaptcha-checkbox-border 未検出 → スキップ');
+      }
       await pageA.waitForTimeout(2000);
-
-      console.log('[run] reCAPTCHA突破後→次へ遷移実行');
-      await nextMonth(pageA);  // 初回遷移
+      console.log('[run] reCAPTCHA突破後→カレンダー表示待機');
+      await waitCalendar(pageA);
     } else {
       console.log('[run] reCAPTCHAなし→初回遷移実行');
       await nextMonth(pageA);  // 初回遷移
