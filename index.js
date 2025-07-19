@@ -26,12 +26,15 @@ async function run() {
   try {
     console.log('[run] 実行開始');
 
+    // A: 監視処理
     console.log('[run] Puppeteer起動 (監視用ブラウザ)');
     browserA = await launchBrowser();
     const pageA = await browserA.newPage();
 
     console.log('[run] ヘッダー・UA設定');
-    await pageA.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/115.0.0.0 Safari/537.36');
+    await pageA.setUserAgent(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/115.0.0.0 Safari/537.36'
+    );
     await pageA.setExtraHTTPHeaders({ 'Accept-Language': 'ja-JP,ja;q=0.9' });
 
     console.log('[run] 固定Cookie注入');
@@ -40,25 +43,30 @@ async function run() {
     console.log('[run] 施設TOPページへアクセス');
     await pageA.goto(INDEX_URL, { waitUntil: 'networkidle2', timeout: 0 });
 
-    console.log('[run] カレンダーリンククリック＆読み込み待機');
+    console.log('[run] カレンダーリンククリック＆reCAPTCHA待機');
+    // リンクを押して、必ず reCAPTCHA iframe が出るまで待つ
     await Promise.all([
       pageA.click('a[href*="/calendar_apply"]'),
-      pageA.waitForSelector('#calendarContent', { timeout: 0 }).catch(() => {})
+      pageA.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout: 60000 })
     ]);
 
-    console.log('[run] reCAPTCHA 検出チェック');
-    const anchorFrame = pageA.frames().find(f => f.url().includes('/recaptcha/api2/anchor'));
+    console.log('[run] reCAPTCHA iframe検出・クリック');
+    const anchorFrame = pageA.frames().find(f =>
+      f.url().includes('/recaptcha/api2/anchor')
+    );
     if (anchorFrame) {
-      console.log('[run] reCAPTCHA 検出 → チェックボックスクリック試行');
       await anchorFrame.click('.recaptcha-checkbox-border');
       await pageA.waitForTimeout(2000);
-      console.log('[run] reCAPTCHA 突破後、次へ遷移実行');
-      await nextMonth(pageA);
+
+      // **ここでカレンダー表示を待機**
+      console.log('[run] reCAPTCHA突破後→カレンダー表示待機');
+      await waitCalendar(pageA);
     } else {
-      console.log('[run] reCAPTCHA なし → 初回遷移実行');
-      await nextMonth(pageA);
+      console.log('[run] reCAPTCHAなし→直接カレンダー表示待機');
+      await waitCalendar(pageA);
     }
 
+    // 月巡回シーケンス：まず当月(includeDate=true)をチェック
     const sequence = [
       { action: null,       includeDate: true },
       { action: nextMonth,  includeDate: false },
@@ -98,15 +106,19 @@ async function run() {
       await sendNoVacancyNotice();
     }
 
+    // ブラウザAはここで閉じる
     await browserA.close();
     browserA = null;
 
+    // B: Cookie更新
     console.log('[run] Puppeteer起動 (Cookie更新用ブラウザ)');
     browserB = await launchBrowser();
     const pageB = await browserB.newPage();
 
     console.log('[run] ヘッダー・UA設定 (B)');
-    await pageB.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/115.0.0.0 Safari/537.36');
+    await pageB.setUserAgent(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/115.0.0.0 Safari/537.36'
+    );
     await pageB.setExtraHTTPHeaders({ 'Accept-Language': 'ja-JP,ja;q=0.9' });
 
     console.log('[run] 固定Cookie注入 (B)');
@@ -119,7 +131,6 @@ async function run() {
     await updateCookiesIfValid(pageB);
 
     console.log('[run] 全処理完了');
-
   } catch (err) {
     console.error('⚠️ 例外発生:', err);
     await sendErrorNotification(err);
@@ -131,3 +142,4 @@ async function run() {
 }
 
 module.exports = { run, warmup, setSharedContext };
+```0
