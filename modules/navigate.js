@@ -40,6 +40,7 @@ async function waitCalendar(page) {
 }
 
 async function nextMonth(page) {
+  console.log('[navigate] 次月へ移動リクエスト');
   await Promise.all([
     page.waitForResponse(r =>
       r.url().includes('/calendar_apply/calendar_select') && r.status() === 200
@@ -50,6 +51,7 @@ async function nextMonth(page) {
 }
 
 async function prevMonth(page) {
+  console.log('[navigate] 前月へ移動リクエスト');
   await Promise.all([
     page.waitForResponse(r =>
       r.url().includes('/calendar_apply/calendar_select') && r.status() === 200
