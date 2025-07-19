@@ -3,6 +3,14 @@
 async function waitCalendar(page) {
   console.log('→ カレンダー領域の検出待機…');
 
+  // 初回にコンテナ自体が現れるのを待機
+  try {
+    await page.waitForSelector('#calendarContent', { timeout: 60000 });
+    console.log('→ #calendarContent 検出完了');
+  } catch (err) {
+    console.warn('⚠️ #calendarContent が初回待機で検出できませんでした');
+  }
+
   const maxAttempts = 2;
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const calendarRoot = await page.$('#calendarContent');
@@ -29,7 +37,7 @@ async function waitCalendar(page) {
 
   try {
     await page.waitForSelector('#calendarContent table.tb-calendar', { timeout: 180000 });
-    console.log('✅ カレンダー領域検出完了（最終waitForSelector）');
+    console.log('✅ カレンダー領域検出完了（最終 waitForSelector）');
   } catch (err) {
     const html = await page.content();
     console.log('⚠️ カレンダーDOM検出失敗。取得HTML（冒頭2000文字）:\n', html.slice(0, 2000));
@@ -47,6 +55,7 @@ async function nextMonth(page) {
     ),
     page.click('input.button-select.button-primary[value="次へ"]')
   ]);
+  console.log('[navigate] 次月レスポンス受信 → カレンダー待機へ');
   await waitCalendar(page);
 }
 
@@ -58,6 +67,7 @@ async function prevMonth(page) {
     ),
     page.click('input.button-select.button-primary[value="前へ"]')
   ]);
+  console.log('[navigate] 前月レスポンス受信 → カレンダー待機へ');
   await waitCalendar(page);
 }
 
