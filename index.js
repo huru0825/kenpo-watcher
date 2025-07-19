@@ -1,3 +1,5 @@
+// index.js
+
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const { launchBrowser } = require('./modules/launch');
@@ -44,7 +46,7 @@ async function run() {
     await pageA.goto(INDEX_URL, { waitUntil: 'networkidle2', timeout: 0 });
 
     console.log('[run] カレンダーリンククリック＆reCAPTCHA待機');
-    // リンクを押して、必ず reCAPTCHA iframe が出るまで待つ
+    // カレンダーリンクを押して、reCAPTCHA iframeが出るまで待機
     await Promise.all([
       pageA.click('a[href*="/calendar_apply"]'),
       pageA.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout: 60000 })
@@ -55,24 +57,24 @@ async function run() {
       f.url().includes('/recaptcha/api2/anchor')
     );
     if (anchorFrame) {
+      console.log('[run] reCAPTCHA検出 → チェックボックスクリック');
       await anchorFrame.click('.recaptcha-checkbox-border');
       await pageA.waitForTimeout(2000);
 
-      // **ここでカレンダー表示を待機**
-      console.log('[run] reCAPTCHA突破後→カレンダー表示待機');
-      await waitCalendar(pageA);
+      console.log('[run] reCAPTCHA突破後→次へ遷移実行');
+      await nextMonth(pageA);  // 初回遷移
     } else {
-      console.log('[run] reCAPTCHAなし→直接カレンダー表示待機');
-      await waitCalendar(pageA);
+      console.log('[run] reCAPTCHAなし→初回遷移実行');
+      await nextMonth(pageA);  // 初回遷移
     }
 
     // 月巡回シーケンス：まず当月(includeDate=true)をチェック
     const sequence = [
-      { action: null,       includeDate: true },
-      { action: nextMonth,  includeDate: false },
-      { action: nextMonth,  includeDate: false },
-      { action: prevMonth,  includeDate: false },
-      { action: prevMonth,  includeDate: true }
+      { action: null,      includeDate: true },
+      { action: nextMonth, includeDate: false },
+      { action: nextMonth, includeDate: false },
+      { action: prevMonth, includeDate: false },
+      { action: prevMonth, includeDate: true }
     ];
 
     const notified = new Set();
@@ -110,7 +112,7 @@ async function run() {
     await browserA.close();
     browserA = null;
 
-    // B: Cookie更新
+    // B: Cookie更新（通知完了後に実行）
     console.log('[run] Puppeteer起動 (Cookie更新用ブラウザ)');
     browserB = await launchBrowser();
     const pageB = await browserB.newPage();
