@@ -1,3 +1,5 @@
+// modules/navigate.js
+
 async function waitCalendar(page) {
   console.log('→ カレンダー領域の検出待機…');
 
@@ -38,7 +40,6 @@ async function waitCalendar(page) {
 }
 
 async function nextMonth(page) {
-  await page.waitForSelector('input.button-select.button-primary[value="次へ"]', { timeout: 10000 });
   await Promise.all([
     page.waitForResponse(r =>
       r.url().includes('/calendar_apply/calendar_select') && r.status() === 200
@@ -49,7 +50,6 @@ async function nextMonth(page) {
 }
 
 async function prevMonth(page) {
-  await page.waitForSelector('input.button-select.button-primary[value="前へ"]', { timeout: 10000 });
   await Promise.all([
     page.waitForResponse(r =>
       r.url().includes('/calendar_apply/calendar_select') && r.status() === 200
