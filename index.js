@@ -56,23 +56,36 @@ async function run() {
     const anchorFrame = pageA.frames().find(f =>
       f.url().includes('/recaptcha/api2/anchor')
     );
+
     if (anchorFrame) {
       const checkbox = await anchorFrame.waitForSelector(
         '.recaptcha-checkbox-border', { timeout: 10000 }
       ).catch(() => null);
+
       if (checkbox) {
         await checkbox.click();
-        console.log('[run] reCAPTCHAチェックボックスクリック成功')
+        console.log('[run] reCAPTCHAチェックボックスクリック成功');
       } else {
         console.warn('⚠️ recaptcha-checkbox-border 未検出 → スキップ');
       }
+
       await pageA.waitForTimeout(2000);
-      console.log('[run] reCAPTCHA突破後→カレンダー表示待機');
-      await waitCalendar(pageA);
+      console.log('[run] reCAPTCHA突破完了');
     } else {
-      console.log('[run] reCAPTCHAなし→初回遷移実行');
-      await nextMonth(pageA);  // 初回遷移
+      console.log('[run] reCAPTCHAなし → 初回遷移へ');
     }
+
+    // **ここで必ず「次へ」押下→カレンダー画面遷移→表示待機**
+    console.log('[run] 次へ押下 → カレンダー画面へ遷移リクエスト');
+    await Promise.all([
+      pageA.click('input.button-select.button-primary[value="次へ"]'),
+      pageA.waitForResponse(r =>
+        r.url().includes('/calendar_apply/calendar_select') && r.status() === 200
+      )
+    ]);
+    console.log('[run] カレンダー画面遷移完了');
+    console.log('[run] カレンダー表示待機開始');
+    await waitCalendar(pageA);
 
     // 月巡回シーケンス：まず当月(includeDate=true)をチェック
     const sequence = [
