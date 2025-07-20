@@ -46,7 +46,6 @@ async function run() {
     await pageA.goto(INDEX_URL, { waitUntil: 'networkidle2', timeout: 0 });
 
     console.log('[run] カレンダーリンククリック＆reCAPTCHA待機');
-    // カレンダーリンクを押して、reCAPTCHA iframeが出るまで待機
     await Promise.all([
       pageA.click('a[href*="/calendar_apply"]'),
       pageA.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout: 60000 })
@@ -62,7 +61,6 @@ async function run() {
       const checkbox = await anchorFrame.waitForSelector(
         '.recaptcha-checkbox-border', { timeout: 10000 }
       ).catch(() => null);
-
       if (checkbox) {
         await checkbox.click();
         console.log('[run] reCAPTCHAチェックボックスクリック成功');
@@ -70,11 +68,9 @@ async function run() {
         console.warn('⚠️ recaptcha-checkbox-border 未検出 → スキップ');
       }
 
-      // 2. チェック完了の検知
-      await anchorFrame.waitForFunction(
-        el => el.getAttribute('aria-checked') === 'true',
-        { timeout: 15000 },
-        await anchorFrame.$('.recaptcha-checkbox-border')
+      // 2. チェック完了の検知（checked クラス付与を待つ）
+      await anchorFrame.waitForSelector(
+        '.recaptcha-checkbox-checked', { timeout: 15000 }
       );
       console.log('[run] reCAPTCHAチェック完了確認');
     } else {
