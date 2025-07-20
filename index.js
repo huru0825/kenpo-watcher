@@ -58,6 +58,7 @@ async function run() {
     );
 
     if (anchorFrame) {
+      // 1. チェックボックスクリック
       const checkbox = await anchorFrame.waitForSelector(
         '.recaptcha-checkbox-border', { timeout: 10000 }
       ).catch(() => null);
@@ -69,21 +70,28 @@ async function run() {
         console.warn('⚠️ recaptcha-checkbox-border 未検出 → スキップ');
       }
 
-      await pageA.waitForTimeout(2000);
-      console.log('[run] reCAPTCHA突破完了');
+      // 2. チェック完了の検知
+      await anchorFrame.waitForFunction(
+        el => el.getAttribute('aria-checked') === 'true',
+        { timeout: 15000 },
+        await anchorFrame.$('.recaptcha-checkbox-border')
+      );
+      console.log('[run] reCAPTCHAチェック完了確認');
     } else {
       console.log('[run] reCAPTCHAなし → 初回遷移へ');
     }
 
-    // **ここで必ず「次へ」押下→カレンダー画面遷移→表示待機**
+    // 3. 次へボタン押下（トークン有効時間内）
     console.log('[run] 次へ押下 → カレンダー画面へ遷移リクエスト');
     await Promise.all([
-      pageA.click('input.button-select.button-primary[value="次へ"]'),
       pageA.waitForResponse(r =>
         r.url().includes('/calendar_apply/calendar_select') && r.status() === 200
-      )
+      ),
+      pageA.click('input.button-select.button-primary[value="次へ"]')
     ]);
-    console.log('[run] カレンダー画面遷移完了');
+    console.log('[run] カレンダー画面に遷移完了 → 次へレスポンス受信');
+
+    // 4. カレンダー描画待機
     console.log('[run] カレンダー表示待機開始');
     await waitCalendar(pageA);
 
