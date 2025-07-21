@@ -1,5 +1,3 @@
-// index.js
-
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const { launchBrowser } = require('./modules/launch');
@@ -24,60 +22,53 @@ async function run() {
   isRunning = true;
 
   let browserA, browserB;
-
   try {
     console.log('[run] 実行開始');
 
-    // A: 監視処理
+    // — A: 監視処理
     console.log('[run] Puppeteer起動 (監視用ブラウザ)');
     browserA = await launchBrowser();
     const pageA = await browserA.newPage();
-
-    console.log('[run] ヘッダー・UA設定');
-    await pageA.setUserAgent(
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/115.0.0.0 Safari/537.36'
-    );
+    await pageA.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/115.0.0.0 Safari/537.36');
     await pageA.setExtraHTTPHeaders({ 'Accept-Language': 'ja-JP,ja;q=0.9' });
-
-    console.log('[run] 固定Cookie注入');
     await pageA.setCookie(...fixedCookies);
 
     console.log('[run] 施設TOPページへアクセス');
     await pageA.goto(INDEX_URL, { waitUntil: 'networkidle2', timeout: 0 });
 
-    console.log('[run] カレンダーリンククリック＆reCAPTCHA待機');
+    console.log('[run] カレンダーリンククリック＆reCAPTCHA iframe待機');
     await Promise.all([
       pageA.click('a[href*="/calendar_apply"]'),
       pageA.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout: 60000 })
     ]);
 
-    console.log('[run] reCAPTCHA iframe検出・クリック');
-    const anchorFrame = pageA.frames().find(f =>
-      f.url().includes('/recaptcha/api2/anchor')
-    );
+    console.log('[run] reCAPTCHA iframe 検出');
+    const anchorFrame = pageA.frames().find(f => f.url().includes('/recaptcha/api2/anchor'));
 
-    if (anchorFrame) {
-      // 1. チェックボックスクリック
-      const checkbox = await anchorFrame.waitForSelector(
-        '.recaptcha-checkbox-border', { timeout: 10000 }
-      ).catch(() => null);
-      if (checkbox) {
-        await checkbox.click();
-        console.log('[run] reCAPTCHAチェックボックスクリック成功');
-      } else {
-        console.warn('⚠️ recaptcha-checkbox-border 未検出 → スキップ');
-      }
-
-      // 2. チェック完了の検知（checked クラス付与を待つ）
-      await anchorFrame.waitForSelector(
-        '.recaptcha-checkbox-checked', { timeout: 15000 }
-      );
-      console.log('[run] reCAPTCHAチェック完了確認');
-    } else {
-      console.log('[run] reCAPTCHAなし → 初回遷移へ');
+    // —— reCAPTCHA 解決フェーズ —— 
+    if (!anchorFrame) {
+      throw new Error('reCAPTCHA iframe が見つかりませんでした');
     }
 
-    // 3. 次へボタン押下（トークン有効時間内）
+    // 1) チェックボックス型か試す
+    console.log('[run] チェックボックス型 reCAPTCHA かどうか判定');
+    const checkbox = await anchorFrame
+      .waitForSelector('.recaptcha-checkbox-border', { timeout: 10000 })
+      .catch(() => null);
+
+    if (checkbox) {
+      // チェックボックス型: クリックして完了を待つ
+      console.log('[run] チェックボックス型 reCAPTCHA 検出 → クリック');
+      await checkbox.click();
+      await anchorFrame.waitForSelector('.recaptcha-checkbox-checked', { timeout: 15000 });
+      console.log('[run] reCAPTCHA チェック完了確認');
+    } else {
+      // 画像認証型: 今回はサポート外とみなしてエラー通知
+      console.error('[run] 画像認証型 reCAPTCHA 検出 → 手動対応が必要です');
+      throw new Error('画像認証型 reCAPTCHA は未対応');
+    }
+
+    // 2) 「次へ」押下 → レスポンス待ち → カレンダー待機
     console.log('[run] 次へ押下 → カレンダー画面へ遷移リクエスト');
     await Promise.all([
       pageA.waitForResponse(r =>
@@ -85,21 +76,17 @@ async function run() {
       ),
       pageA.click('input.button-select.button-primary[value="次へ"]')
     ]);
-    console.log('[run] カレンダー画面に遷移完了 → 次へレスポンス受信');
-
-    // 4. カレンダー描画待機
-    console.log('[run] カレンダー表示待機開始');
+    console.log('[run] カレンダー画面遷移完了 → カレンダー描画待機開始');
     await waitCalendar(pageA);
 
-    // 月巡回シーケンス：まず当月(includeDate=true)をチェック
+    // — 月巡回シーケンス —
     const sequence = [
-      { action: null,      includeDate: true },
-      { action: nextMonth, includeDate: false },
-      { action: nextMonth, includeDate: false },
-      { action: prevMonth, includeDate: false },
-      { action: prevMonth, includeDate: true }
+      { action: null,       includeDate: true },
+      { action: nextMonth,  includeDate: false },
+      { action: nextMonth,  includeDate: false },
+      { action: prevMonth,  includeDate: false },
+      { action: prevMonth,  includeDate: true }
     ];
-
     const notified = new Set();
 
     for (const { action, includeDate } of sequence) {
@@ -107,16 +94,9 @@ async function run() {
         console.log(`[run] ${action.name} 実行`);
         await action(pageA);
       }
-
-      console.log(`[run] visitMonth(includeDate=${includeDate}) 実行`);
+      console.log(`[run] visitMonth(includeDate=${includeDate})`);
       const hits = await visitMonth(pageA, includeDate);
-
-      if (hits.length > 0) {
-        console.log(`[run] 空き検出: ${hits.join(', ')}`);
-      } else {
-        console.log('[run] 空きなし');
-      }
-
+      console.log(hits.length ? `[run] 空き検出: ${hits.join(', ')}` : '[run] 空きなし');
       for (const label of hits) {
         if (!notified.has(label)) {
           notified.add(label);
@@ -125,34 +105,24 @@ async function run() {
         }
       }
     }
-
-    if (notified.size === 0) {
-      console.log('[run] 空きなし通知を送信');
+    if (!notified.size) {
+      console.log('[run] 空きなし通知送信');
       await sendNoVacancyNotice();
     }
 
-    // ブラウザAはここで閉じる
     await browserA.close();
     browserA = null;
 
-    // B: Cookie更新（通知完了後に実行）
+    // — B: Cookie更新用ブラウザ起動 —
     console.log('[run] Puppeteer起動 (Cookie更新用ブラウザ)');
     browserB = await launchBrowser();
     const pageB = await browserB.newPage();
-
-    console.log('[run] ヘッダー・UA設定 (B)');
-    await pageB.setUserAgent(
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/115.0.0.0 Safari/537.36'
-    );
+    await pageB.setUserAgent(pageA._userAgent);
     await pageB.setExtraHTTPHeaders({ 'Accept-Language': 'ja-JP,ja;q=0.9' });
-
-    console.log('[run] 固定Cookie注入 (B)');
     await pageB.setCookie(...fixedCookies);
-
     console.log('[run] Cookie更新ページ遷移');
     await pageB.goto(INDEX_URL, { waitUntil: 'networkidle2', timeout: 0 });
-
-    console.log('[run] Cookie更新処理へ');
+    console.log('[run] Cookie更新処理');
     await updateCookiesIfValid(pageB);
 
     console.log('[run] 全処理完了');
