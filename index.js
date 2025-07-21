@@ -2,6 +2,8 @@
 
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+const axios = require('axios');
+const { speechToText } = require('./modules/speechToText');  // 音声文字起こし関数
 const { launchBrowser } = require('./modules/launch');
 const { waitCalendar, nextMonth, prevMonth } = require('./modules/navigate');
 const { visitMonth } = require('./modules/visitMonth');
@@ -47,7 +49,8 @@ async function run() {
       pageA.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout: 60000 })
     ]);
 
-    // iframe 要素を取得→そのコンテンツフレームを取得
+    // ↓ ここから reCAPTCHA＋音声チャレンジ＋次へ の新処理 ↓
+
     console.log('[run] reCAPTCHA iframe 要素取得');
     const iframeHandle = await pageA.$('iframe[src*="/recaptcha/api2/anchor"]');
     if (!iframeHandle) {
@@ -69,16 +72,39 @@ async function run() {
     if (checkbox) {
       console.log('[run] チェックボックス型検出 → クリック');
       await checkbox.click();
-      // チェック完了を待機（aria-checked 属性変化 or チェック済みクラス）
+      // チェック完了を待機（aria-checked 属性変化 or CSSクラス）
       await anchorFrame.waitForFunction(
-        el => el.getAttribute('aria-checked') === 'true' || el.classList.contains('recaptcha-checkbox-checked'),
+        el =>
+          el.getAttribute('aria-checked') === 'true' ||
+          el.classList.contains('recaptcha-checkbox-checked'),
         { timeout: 15000 },
         await anchorFrame.$('.recaptcha-checkbox-border')
       );
       console.log('[run] reCAPTCHA チェック完了確認');
     } else {
       console.error('[run] 画像認証型 reCAPTCHA 検出 → 非対応');
-      throw new Error('画像認証型 reCAPTCHA は未対応です');
+      // 音声チャレンジにフォールバック
+      console.log('[run] 音声チャレンジへ切り替え');
+      const verifyFrame = pageA.frames().find(f => f.url().includes('bframe'));
+      await verifyFrame.click('#recaptcha-audio-button');
+      const audioSrc = await verifyFrame.$eval(
+        'a.rc-audiochallenge-tdownload-link',
+        el => el.href
+      );
+      const audioBuffer = await axios
+        .get(audioSrc, { responseType: 'arraybuffer' })
+        .then(res => res.data);
+      const transcript = await speechToText(audioBuffer);
+      await verifyFrame.type('#audio-response', transcript);
+      await verifyFrame.click('#recaptcha-verify-button');
+      await anchorFrame.waitForFunction(
+        el =>
+          el.getAttribute('aria-checked') === 'true' ||
+          el.classList.contains('recaptcha-checkbox-checked'),
+        { timeout: 15000 },
+        await anchorFrame.$('.recaptcha-checkbox-border')
+      );
+      console.log('[run] 音声チャレンジ突破確認');
     }
 
     // 2) 「次へ」押下 → レスポンス待ち → カレンダー描画待機
@@ -91,6 +117,8 @@ async function run() {
     ]);
     console.log('[run] カレンダー画面遷移完了 → カレンダー表示待機開始');
     await waitCalendar(pageA);
+
+    // ↑ ここまで新処理 ↑
 
     // 月巡回シーケンス
     const sequence = [
