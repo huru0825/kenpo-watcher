@@ -16,7 +16,8 @@
     "follow-redirects": "^1.15.9",
     "form-data": "^4.0.3",
     "proxy-from-env": "^1.1.0",
-    "random-useragent": "^0.5.0"
+    "random-useragent": "^0.5.0",
+    "@google-cloud/speech": "^4.4.0"
   },
   "devDependencies": {
     "esbuild": "^0.19.12",
