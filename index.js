@@ -57,13 +57,13 @@ async function run() {
     } else {
       console.log('[run] 画像認証型 reCAPTCHA 検出 → 音声モードへ切替');
 
-      // bframeの出現を待機
-      await pageA.waitForFunction(
-        () => [...document.querySelectorAll('iframe')].some(f => f.src.includes('bframe')),
-        { timeout: 15000 }
-      );
-
-      const verifyFrame = pageA.frames().find(f => f.url().includes('bframe'));
+      // bframe フレームが読み込まれるまで最大15秒待機（500msポーリング）
+      let verifyFrame;
+      for (let i = 0; i < 30; i++) {
+        verifyFrame = pageA.frames().find(f => f.url().includes('bframe'));
+        if (verifyFrame) break;
+        await pageA.waitForTimeout(500);
+      }
       if (!verifyFrame) throw new Error('bframeが見つかりません');
 
       await verifyFrame.waitForSelector('#recaptcha-audio-button', { timeout: 10000 });
