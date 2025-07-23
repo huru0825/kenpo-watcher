@@ -8,7 +8,7 @@ const {
   INDEX_URL
 } = require('./modules/constants');
 
-const { selectCookies } = require('./modules/cookieSelector'); // ✅ 新モジュール導入
+const { selectCookies } = require('./modules/cookieSelector');
 
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
@@ -18,10 +18,8 @@ const app = express();
 app.use(express.json());
 
 (async () => {
-  // ✅ Cookie をスプレッドシート or 固定JSON から選択
   const selectedCookies = await selectCookies();
 
-  // Puppeteer起動コンテキストを設定
   setSharedContext({
     puppeteer,
     launchOptions: {
@@ -42,10 +40,8 @@ app.use(express.json());
     webhookUrl: GAS_WEBHOOK_URL
   });
 
-  // ヘルスチェック
   app.get('/health', (req, res) => res.send('OK'));
 
-  // CRONトリガー
   app.get('/run', async (req, res) => {
     try {
       await run();
@@ -55,6 +51,7 @@ app.use(express.json());
       res.sendStatus(500);
     }
   });
+
   app.post('/run', async (req, res) => {
     try {
       await run();
@@ -65,14 +62,17 @@ app.use(express.json());
     }
   });
 
-  // ポートバインド＋Warmup
   const port = process.env.PORT || 10000;
   app.listen(port, async () => {
     console.log(`Server listening on port ${port}`);
     try {
       console.log('✨ Warmup: launching browser to avoid cold start...');
-      await warmup();
-      console.log('✨ Warmup completed');
+      if (typeof warmup === 'function') {
+        await warmup();
+        console.log('✨ Warmup completed');
+      } else {
+        console.warn('⚠️ Warmup is not defined as function → skip');
+      }
     } catch (e) {
       console.error('⚠️ Warmup failed (ignored):', e);
     }
