@@ -57,7 +57,6 @@ async function run() {
     } else {
       console.log('[run] 画像認証型 reCAPTCHA 検出 → 音声モードへ切替');
 
-      // bframe フレームが読み込まれるまで最大15秒待機（500msポーリング）
       let verifyFrame;
       for (let i = 0; i < 30; i++) {
         verifyFrame = pageA.frames().find(f => f.url().includes('bframe'));
@@ -66,12 +65,15 @@ async function run() {
       }
       if (!verifyFrame) throw new Error('bframeが見つかりません');
 
-      await verifyFrame.waitForSelector('#recaptcha-audio-button', { timeout: 10000 });
+      await verifyFrame.waitForSelector('#recaptcha-audio-button', { timeout: 20000 });
+      await pageA.waitForTimeout(1000); // 安定化待機
       await verifyFrame.click('#recaptcha-audio-button');
+
       const audioPath = await downloadAudioFromPage(verifyFrame);
       const transcript = await transcribeAudio(audioPath);
       await verifyFrame.type('#audio-response', transcript);
       await verifyFrame.click('#recaptcha-verify-button');
+
       await anchorFrame.waitForFunction(
         el => el.getAttribute('aria-checked') === 'true' || el.classList.contains('recaptcha-checkbox-checked'),
         { timeout: 15000 },
@@ -137,7 +139,6 @@ async function run() {
   }
 }
 
-// Warmup関数（cold start防止用）
 async function warmup() {
   const browser = await launchBrowser();
   await browser.close();
