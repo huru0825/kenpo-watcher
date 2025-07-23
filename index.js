@@ -27,7 +27,6 @@ async function run() {
   try {
     console.log('[run] 実行開始');
 
-    // Aブラウザ起動
     browserA = await launchBrowser();
     const pageA = await browserA.newPage();
     await pageA.setUserAgent(sharedContext.userAgent);
@@ -37,14 +36,12 @@ async function run() {
     console.log('[run] TOPページアクセス');
     await pageA.goto(sharedContext.url, { waitUntil: 'networkidle2', timeout: 0 });
 
-    // カレンダーリンク押下
     console.log('[run] カレンダーリンククリック＆iframe待機');
     await Promise.all([
       pageA.click('a[href*="/calendar_apply"]'),
       pageA.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout: 60000 })
     ]);
 
-    // reCAPTCHAチェック
     const iframeHandle = await pageA.$('iframe[src*="/recaptcha/api2/anchor"]');
     const anchorFrame = await iframeHandle?.contentFrame();
     const checkbox = await anchorFrame?.$('.recaptcha-checkbox-border').catch(() => null);
@@ -73,7 +70,6 @@ async function run() {
       console.log('[run] 音声チャレンジ突破確認完了');
     }
 
-    // 次へ → カレンダー表示待機
     console.log('[run] 「次へ」押下');
     await Promise.all([
       pageA.waitForResponse(r => r.url().includes('/calendar_apply/calendar_select') && r.status() === 200),
@@ -81,7 +77,6 @@ async function run() {
     ]);
     await waitCalendar(pageA);
 
-    // 巡回シーケンス（今→次→次→前→前）
     const sequence = [
       { action: null,       includeDate: true },
       { action: nextMonth,  includeDate: false },
@@ -112,7 +107,6 @@ async function run() {
     await browserA.close();
     browserA = null;
 
-    // BブラウザでCookie更新
     console.log('[run] Bブラウザ起動（Cookie更新）');
     browserB = await launchBrowser();
     const pageB = await browserB.newPage();
@@ -133,4 +127,10 @@ async function run() {
   }
 }
 
-module.exports = { run, setSharedContext };
+// Warmup関数（cold start防止用）
+async function warmup() {
+  const browser = await launchBrowser();
+  await browser.close();
+}
+
+module.exports = { run, setSharedContext, warmup };
