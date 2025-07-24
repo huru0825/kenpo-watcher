@@ -1,5 +1,3 @@
-// index.js
-
 const fs = require('fs');
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
@@ -9,7 +7,7 @@ const { visitMonth } = require('./modules/visitMonth');
 const { sendNotification, sendNoVacancyNotice, sendErrorNotification } = require('./modules/notifier');
 // ✏️ CHANGED: saveCookies を追加インポート
 const { updateCookiesIfValid, saveCookies } = require('./modules/cookieUpdater');
-// ✏️ CHANGED: 新しい network-based ダウンロードを行う audioDownloader
+// ✏️ CHANGED: network-based ダウンロードを行う audioDownloader
 const { downloadAudioFromPage } = require('./modules/audioDownloader');
 const { transcribeAudio } = require('./modules/whisper');
 const { INDEX_URL, TARGET_FACILITY_NAME } = require('./modules/constants');
@@ -37,7 +35,7 @@ async function run() {
     await pageA.setUserAgent(sharedContext.userAgent);
     await pageA.setExtraHTTPHeaders(sharedContext.headers);
 
-    // Cookie注入（スプレッドシートにあれば）
+    // Cookie注入（シートにあれば）
     if (sharedContext.cookies?.length) {
       console.log('[run] スプレッドシートから Cookie 注入');
       await pageA.setCookie(...sharedContext.cookies);
