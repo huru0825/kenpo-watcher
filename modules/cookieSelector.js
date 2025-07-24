@@ -1,27 +1,30 @@
-const { readCookiesFromSpreadsheet } = require('./spreadsheet');
-const { fixedCookies } = require('./constants');
+// modules/cookieSelector.js
+
+const axios = require('axios');
+const { GAS_WEBHOOK_URL } = require('./constants');
 
 /**
- * スプレッドシートにクッキーが存在すればそちらを返し、
- * なければ固定Cookie（Cookie.json）を返す。
+ * スプレッドシートから Cookie を取得し、空なら空配列を返す
+ * @returns {Promise<import('puppeteer').Cookie[]>}
  */
 async function selectCookies() {
+  if (!GAS_WEBHOOK_URL) {
+    console.warn('ℹ️ GAS_WEBHOOK_URL 未設定 → Cookie 取得をスキップ');
+    return [];
+  }
+
   try {
-    const cookies = await readCookiesFromSpreadsheet();
-
-    const hasHeader = Array.isArray(cookies) && cookies.length > 0;
-    const hasCookieData = hasHeader && cookies.some(c => typeof c.name === 'string' && c.value);
-
-    if (hasCookieData) {
-      console.log('✅ スプレッドシートからCookieを取得');
-      return cookies;
+    const resp = await axios.get(GAS_WEBHOOK_URL, { timeout: 5000 });
+    if (Array.isArray(resp.data) && resp.data.length > 0) {
+      console.log(`✅ スプレッドシートから Cookie を取得 (${resp.data.length} 件)`);
+      return resp.data;
     } else {
-      console.warn('⚠️ スプレッドシートに有効なCookieが見つかりません → 固定Cookieを使用します');
-      return fixedCookies;
+      console.log('ℹ️ スプレッドシートに Cookie が見つかりませんでした → 空配列で進行');
+      return [];
     }
-  } catch (e) {
-    console.error('❌ Cookie読み込み中にエラー → 固定Cookieにフォールバック:', e.message);
-    return fixedCookies;
+  } catch (err) {
+    console.warn('⚠️ スプレッドシートから Cookie 取得失敗:', err.message);
+    return [];
   }
 }
 
