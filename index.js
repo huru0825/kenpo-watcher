@@ -44,6 +44,7 @@ async function run() {
 
     const iframeHandle = await pageA.$('iframe[src*="/recaptcha/api2/anchor"]');
     const anchorFrame = await iframeHandle?.contentFrame();
+
     const checkbox = await anchorFrame?.$('.recaptcha-checkbox-border').catch(() => null);
 
     if (checkbox) {
@@ -55,9 +56,13 @@ async function run() {
         await anchorFrame.$('.recaptcha-checkbox-border')
       );
     } else {
-      console.log('[run] 画像認証型 reCAPTCHA 検出 → 音声モードへ切替');
+      console.log('[run] reCAPTCHA anchor クリックでbframe強制出現 → 音声モードへ切替');
 
-      console.log('[debug] iframe URLs:', pageA.frames().map(f => f.url()));
+      const anchor = await anchorFrame.$('#recaptcha-anchor');
+      if (anchor) {
+        await anchor.click();
+        await pageA.waitForTimeout(1000);
+      }
 
       let verifyFrame;
       for (let i = 0; i < 30; i++) {
@@ -77,7 +82,7 @@ async function run() {
       };
 
       const audioBtn = await findAudioButton(verifyFrame);
-      await pageA.waitForTimeout(1000); // 要素の安定表示待機
+      await pageA.waitForTimeout(1000);
       await audioBtn.click();
 
       const audioPath = await downloadAudioFromPage(verifyFrame);
