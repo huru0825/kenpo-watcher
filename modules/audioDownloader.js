@@ -1,7 +1,6 @@
 // modules/audioDownloader.js
 const fs = require('fs');
 const path = require('path');
-const { downloadAudioFromPage } = module.exports; // 自己参照
 const { transcribeAudio } = require('./whisper');
 
 /**
@@ -14,10 +13,11 @@ async function downloadAudioFromPage(frame) {
   console.log('🎧 音声チャレンジの音源をネットワーク経由でキャッチ中…');
   const page = frame.page ? frame.page() : frame._page;
 
-  const audioResponse = page.waitForResponse(response =>
-    response.url().includes('/recaptcha/api2/payload') &&
-    response.request().resourceType() === 'media' &&
-    response.headers()['content-type']?.startsWith('audio'),
+  const audioResponse = page.waitForResponse(
+    response =>
+      response.url().includes('/recaptcha/api2/payload') &&
+      response.request().resourceType() === 'media' &&
+      response.headers()['content-type']?.startsWith('audio'),
     { timeout: 20000 }
   );
   const response = await audioResponse;
