@@ -1,19 +1,22 @@
 // modules/audioDownloader.js
+
 const fs = require('fs');
 const path = require('path');
 
 /**
  * reCAPTCHA 音声チャレンジの音源を
- * XHR／MediaStream 経由でもキャッチできるように
- * ネットワークリスナーを使ってダウンロード
+ * ネットワークリスナー経由でキャッチしてダウンロード
+ * @param {import('puppeteer').Frame} frame 音声チャレンジが描画された reCAPTCHA bframe
+ * @returns {Promise<string>} ダウンロードした音声ファイルのパス
  */
 async function downloadAudioFromPage(frame) {
   console.log('🎧 音声チャレンジの音源をネットワーク経由でキャッチ中…');
 
   // Puppeteer のページオブジェクトを取得
-  const page = frame._page;  // internal api, Puppeteer v14+なら frame.page()
+  // Puppeteer v14 以降は frame.page() が公式API
+  const page = frame.page ? frame.page() : frame._page;
 
-  // ネットワークレスポンス待ちの Promise をセットアップ
+  // 音声リクエストを待ち受け（payload エンドポイント＋media リソース）
   const audioResponse = page.waitForResponse(response =>
     response.url().includes('/recaptcha/api2/payload') &&
     response.request().resourceType() === 'media' &&
@@ -21,10 +24,10 @@ async function downloadAudioFromPage(frame) {
     { timeout: 20000 }
   );
 
-  // 既存の「音声チャレンジ切替」クリック等はそのまま
-  // （省略: findAudioButton→audioBtn.click()→transcribe など）
+  // ここでは既存の「音声モード切替」クリックが済んでいる前提です
+  // （呼び出し元で findAudioButton → audioBtn.click() を行ってください）
 
-  // ここで audioResponse が解決され、実際のバイナリを取得
+  // ネットワークから返ってきた音声バイナリを取得
   const response = await audioResponse;
   const buffer = await response.buffer();
 
