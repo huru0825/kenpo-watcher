@@ -42,23 +42,35 @@ async function run() {
       console.log('[run] シートにCookieなし → Cookie注入スキップ');
     }
 
-    // — TOPページアクセス —
+    // — TOPページアクセス & カレンダー申込ページへの遷移 —
     console.log('[run] TOPページアクセス');
     await pageA.goto(sharedContext.url, { waitUntil: 'networkidle2', timeout: 0 });
+    console.log('[run] カレンダーリンククリック');
+    await Promise.all([
+      pageA.click('a[href*="/calendar_apply"]'),
+      pageA.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout: 60000 })
+    ]);
 
-    // — reCAPTCHA フロー開始 —  
+    // — reCAPTCHA 突破開始 —
     console.log('[run] reCAPTCHA 突破開始');
     const bypassed = await solveRecaptcha(pageA);
-    if (bypassed) {
-      console.log('[run] ✅ reCAPTCHA bypass succeeded');
-    } else {
-      console.warn('[run] ⚠️ reCAPTCHA bypass failed or not present');
+    if (!bypassed) {
+      throw new Error('reCAPTCHA 突破に失敗したため処理を中断します');
     }
+    console.log('[run] ✅ reCAPTCHA bypass succeeded');
+    // 突破後、チェックボックスにチェックが入るまで待機
+    await pageA.waitForFunction(
+      () => {
+        const frame = document.querySelector('iframe[src*="/recaptcha/api2/anchor"]');
+        if (!frame) return false;
+        const doc = frame.contentWindow.document;
+        return !!doc.querySelector('#recaptcha-anchor[aria-checked="true"], .recaptcha-checkbox-checked');
+      },
+      { timeout: 10000 }
+    );
+    console.log('[run] reCAPTCHA チェック確認済み');
 
-    // — カレンダーリンククリック＆「次へ」ボタン押下＆待機 —
-    console.log('[run] カレンダーリンククリック');
-    await pageA.click('a[href*="/calendar_apply"]');
-
+    // — 「次へ」ボタン押下＆カレンダー待機 —
     console.log('[run] 「次へ」ボタン押下＆カレンダー待機');
     await Promise.all([
       pageA.waitForResponse(r =>
