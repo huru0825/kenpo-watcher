@@ -47,7 +47,6 @@ async function run() {
     await pageA.goto(sharedContext.url, { waitUntil: 'networkidle2', timeout: 0 });
 
     // — reCAPTCHA フロー開始 —  
-    // ✏️ CHANGED: サンプルロジックをまとめて呼び出し  
     console.log('[run] reCAPTCHA 突破開始');
     const bypassed = await solveRecaptcha(pageA);
     if (bypassed) {
@@ -56,14 +55,15 @@ async function run() {
       console.warn('[run] ⚠️ reCAPTCHA bypass failed or not present');
     }
 
-    // — 「次へ」押下＆カレンダー待機 —
-    console.log('[run] カレンダーリンククリック＆「次へ」ボタン待機');
+    // — カレンダーリンククリック＆「次へ」ボタン押下＆待機 —
+    console.log('[run] カレンダーリンククリック');
+    await pageA.click('a[href*="/calendar_apply"]');
+
+    console.log('[run] 「次へ」ボタン押下＆カレンダー待機');
     await Promise.all([
-      pageA.click('a[href*="/calendar_apply"]'),
-      pageA.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout: 60000 })
-    ]);
-    await Promise.all([
-      pageA.waitForResponse(r => r.url().includes('/calendar_apply/calendar_select') && r.status() === 200),
+      pageA.waitForResponse(r =>
+        r.url().includes('/calendar_apply/calendar_select') && r.status() === 200
+      ),
       pageA.click('input.button-select.button-primary[value="次へ"]')
     ]);
     await waitCalendar(pageA);
