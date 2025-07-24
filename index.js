@@ -7,7 +7,9 @@ const { launchBrowser } = require('./modules/launch');
 const { waitCalendar, nextMonth, prevMonth } = require('./modules/navigate');
 const { visitMonth } = require('./modules/visitMonth');
 const { sendNotification, sendNoVacancyNotice, sendErrorNotification } = require('./modules/notifier');
+// ✏️ CHANGED: saveCookies を追加インポート
 const { updateCookiesIfValid, saveCookies } = require('./modules/cookieUpdater');
+// ✏️ CHANGED: 新しい network-based ダウンロードを行う audioDownloader
 const { downloadAudioFromPage } = require('./modules/audioDownloader');
 const { transcribeAudio } = require('./modules/whisper');
 const { INDEX_URL, TARGET_FACILITY_NAME } = require('./modules/constants');
@@ -29,13 +31,13 @@ async function run() {
   try {
     console.log('[run] 実行開始');
 
-    // Aブラウザ起動・初期設定
+    // — Aブラウザ起動・初期設定 —
     browserA = await launchBrowser();
     const pageA = await browserA.newPage();
     await pageA.setUserAgent(sharedContext.userAgent);
     await pageA.setExtraHTTPHeaders(sharedContext.headers);
 
-    // Cookie注入（シートにあれば）
+    // Cookie注入（スプレッドシートにあれば）
     if (sharedContext.cookies?.length) {
       console.log('[run] スプレッドシートから Cookie 注入');
       await pageA.setCookie(...sharedContext.cookies);
@@ -43,11 +45,11 @@ async function run() {
       console.log('[run] スプレッドシートにCookieなし → Cookie注入スキップ');
     }
 
-    // TOPページアクセス
+    // — TOPページアクセス —
     console.log('[run] TOPページアクセス');
     await pageA.goto(sharedContext.url, { waitUntil: 'networkidle2', timeout: 0 });
 
-    // reCAPTCHAフロー開始
+    // — reCAPTCHA フロー開始 —
     console.log('[run] カレンダーリンククリック＆iframe待機');
     await Promise.all([
       pageA.click('a[href*="/calendar_apply"]'),
@@ -55,22 +57,23 @@ async function run() {
     ]);
 
     const iframeHandle = await pageA.$('iframe[src*="/recaptcha/api2/anchor"]');
-    const anchorFrame = await iframeHandle.contentFrame();
+    const anchorFrame  = await iframeHandle.contentFrame();
 
-    // チェックボックス型 reCAPTCHA 
+    // (1) チェックボックス型 reCAPTCHA
     const checkbox = await anchorFrame.$('.recaptcha-checkbox-border').catch(() => null);
     if (checkbox) {
       console.log('[run] チェックボックス型 reCAPTCHA 検出 → クリック');
       await checkbox.click();
       await anchorFrame.waitForFunction(
-        el => el.getAttribute('aria-checked') === 'true' || el.classList.contains('recaptcha-checkbox-checked'),
+        el => el.getAttribute('aria-checked') === 'true' ||
+              el.classList.contains('recaptcha-checkbox-checked'),
         { timeout: 15000 },
         await anchorFrame.$('.recaptcha-checkbox-border')
       );
       console.log('[run] reCAPTCHA チェック完了');
 
     } else {
-      // 音声モードへ切替
+      // (2) 音声モードへ切替
       console.log('[run] reCAPTCHA anchor クリックでbframe強制出現 → 音声モードへ切替');
       const anchor = await anchorFrame.$('#recaptcha-anchor');
       if (anchor) {
@@ -78,7 +81,7 @@ async function run() {
         await pageA.waitForTimeout(1000);
       }
 
-      // bframeポーリング
+      // bframe ポーリング
       let verifyFrame;
       for (let i = 0; i < 30; i++) {
         verifyFrame = pageA.frames().find(f => f.url().includes('bframe'));
@@ -87,7 +90,7 @@ async function run() {
       }
       if (!verifyFrame) throw new Error('bframeが見つかりません');
 
-      // 音声ボタン探索
+      // (3) 音声ボタン探索
       const findAudioButton = async frame => {
         for (let i = 0; i < 10; i++) {
           const btn = await frame.$('#recaptcha-audio-button');
@@ -100,7 +103,7 @@ async function run() {
       await pageA.waitForTimeout(1000);
       await audioBtn.click();
 
-      // 音声ダウンロード＆Whisper文字起こし
+      // (4) ネットワーク経由で取得した音声を保存→Whisperで文字起こし
       const audioPath = await downloadAudioFromPage(verifyFrame);
       const transcript = await transcribeAudio(audioPath);
 
@@ -112,14 +115,15 @@ async function run() {
 
       // 成功確認
       await anchorFrame.waitForFunction(
-        el => el.getAttribute('aria-checked') === 'true' || el.classList.contains('recaptcha-checkbox-checked'),
+        el => el.getAttribute('aria-checked') === 'true' ||
+              el.classList.contains('recaptcha-checkbox-checked'),
         { timeout: 15000 },
         await anchorFrame.$('.recaptcha-checkbox-border')
       );
       console.log('[run] 音声チャレンジ突破確認完了');
     }
 
-    // 次へ押下＆カレンダー待機
+    // — 次へ押下＆カレンダー待機 —
     console.log('[run] 「次へ」押下');
     await Promise.all([
       pageA.waitForResponse(r => r.url().includes('/calendar_apply/calendar_select') && r.status() === 200),
@@ -127,7 +131,7 @@ async function run() {
     ]);
     await waitCalendar(pageA);
 
-    // 月巡回シーケンス
+    // — 月巡回シーケンス & 通知 —
     const sequence = [
       { action: null,      includeDate: true },
       { action: nextMonth, includeDate: false },
@@ -153,7 +157,7 @@ async function run() {
       await sendNoVacancyNotice();
     }
 
-    // シート空なら一度だけ Cookie 保存
+    // ✏️ CHANGED: 「一度だけ」シートが空なら最新Cookieをスプレッドシートへ保存
     if (!sharedContext.cookies?.length) {
       console.log('[run] シート空 → 現行Cookieを保存');
       const current = await pageA.cookies();
@@ -163,14 +167,13 @@ async function run() {
     await browserA.close();
     browserA = null;
 
-    // BブラウザでCookie更新
+    // — BブラウザでCookie更新 —
     console.log('[run] Bブラウザ起動（Cookie更新）');
     browserB = await launchBrowser();
     const pageB = await browserB.newPage();
     await pageB.setUserAgent(sharedContext.userAgent);
     await pageB.setExtraHTTPHeaders(sharedContext.headers);
 
-    // Bブラウザの Cookie 注入
     if (sharedContext.cookies?.length) {
       console.log('[run] Bブラウザに Cookie 注入');
       await pageB.setCookie(...sharedContext.cookies);
@@ -186,7 +189,6 @@ async function run() {
   } catch (err) {
     console.error('⚠️ 例外発生:', err);
     await sendErrorNotification(err);
-
   } finally {
     if (browserA) await browserA.close();
     if (browserB) await browserB.close();
