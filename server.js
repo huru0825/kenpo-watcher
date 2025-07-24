@@ -18,8 +18,10 @@ const app = express();
 app.use(express.json());
 
 (async () => {
+  // スプレッドシートから Cookie を選択（空なら null）
   const selectedCookies = await selectCookies();
 
+  // Puppeteer 起動コンテキストを設定
   setSharedContext({
     puppeteer,
     launchOptions: {
@@ -35,13 +37,15 @@ app.use(express.json());
     },
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/115.0.0.0 Safari/537.36',
     headers: { 'Accept-Language': 'ja-JP,ja;q=0.9' },
-    cookies: selectedCookies,
+    cookies: selectedCookies,    // 固定Cookieは投入せず、シートのものだけ
     url: INDEX_URL,
     webhookUrl: GAS_WEBHOOK_URL
   });
 
+  // ヘルスチェック
   app.get('/health', (req, res) => res.send('OK'));
 
+  // CRON トリガー（GET/POST 共通）
   app.get('/run', async (req, res) => {
     try {
       await run();
@@ -51,7 +55,6 @@ app.use(express.json());
       res.sendStatus(500);
     }
   });
-
   app.post('/run', async (req, res) => {
     try {
       await run();
@@ -62,6 +65,7 @@ app.use(express.json());
     }
   });
 
+  // ポートバインド＋Warmup
   const port = process.env.PORT || 10000;
   app.listen(port, async () => {
     console.log(`Server listening on port ${port}`);
