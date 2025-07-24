@@ -57,7 +57,8 @@ async function run() {
     } else {
       console.log('[run] 画像認証型 reCAPTCHA 検出 → 音声モードへ切替');
 
-      // bframe フレームの出現をポーリングで安定検知（最大15秒）
+      console.log('[debug] iframe URLs:', pageA.frames().map(f => f.url()));
+
       let verifyFrame;
       for (let i = 0; i < 30; i++) {
         verifyFrame = pageA.frames().find(f => f.url().includes('bframe'));
@@ -66,9 +67,18 @@ async function run() {
       }
       if (!verifyFrame) throw new Error('bframeが見つかりません');
 
-      await verifyFrame.waitForSelector('#recaptcha-audio-button', { timeout: 20000 });
+      const findAudioButton = async (frame) => {
+        for (let i = 0; i < 10; i++) {
+          const btn = await frame.$('#recaptcha-audio-button');
+          if (btn) return btn;
+          await frame.waitForTimeout(1000);
+        }
+        throw new Error('#recaptcha-audio-button が出現しませんでした');
+      };
+
+      const audioBtn = await findAudioButton(verifyFrame);
       await pageA.waitForTimeout(1000); // 要素の安定表示待機
-      await verifyFrame.click('#recaptcha-audio-button');
+      await audioBtn.click();
 
       const audioPath = await downloadAudioFromPage(verifyFrame);
       const transcript = await transcribeAudio(audioPath);
@@ -143,7 +153,6 @@ async function run() {
   }
 }
 
-// Warmup関数（cold start防止用）
 async function warmup() {
   const browser = await launchBrowser();
   await browser.close();
