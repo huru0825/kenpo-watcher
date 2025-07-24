@@ -1,5 +1,6 @@
 // modules/launch.js
-const puppeteer = require('puppeteer-extra');
+// puppeteer を再代入できるよう let で宣言
+let puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 puppeteer.use(StealthPlugin());
 
