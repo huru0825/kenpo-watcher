@@ -1,39 +1,30 @@
-const fs = require('fs');
-const path = require('path');
-const axios = require('axios');
-const { fixedCookies, GAS_WEBHOOK_URL } = require('./constants');
+// modules/cookieUpdater.js
 
-async function updateCookiesIfValid(page) {
-  const captchaDetected = await page.$('iframe[src*="recaptcha"]');
-  if (captchaDetected) {
-    console.warn('⚠️ Bブラウザ: CAPTCHA出現。Cookie保存スキップ');
+const fs = require('fs');
+const axios = require('axios');
+const { GAS_WEBHOOK_URL } = require('./constants');
+
+/**
+ * ページから取得した Cookie 配列をローカル保存＆スプレッドシートへ書き込む
+ * @param {import('puppeteer').Protocol.Network.Cookie[]} cookies
+ */
+async function saveCookies(cookies) {
+  // ローカルにも JSON として出力（デバッグ用）
+  fs.writeFileSync('updated_cookies.json', JSON.stringify(cookies, null, 2), 'utf-8');
+  console.log('💾 Cookie保存完了: updated_cookies.json');
+
+  // スプレッドシートへの書き込み
+  if (!GAS_WEBHOOK_URL) {
+    console.warn('⚠️ GAS_WEBHOOK_URL 未設定 → スプレッドシート書き込みをスキップ');
     return;
   }
 
-  const updatedCookies = await page.cookies();
-
-  // ローカルログとして保存（Render上でも確認用）
-  fs.writeFileSync('updated_cookies.json', JSON.stringify(updatedCookies, null, 2), 'utf-8');
-  console.log('💾 Cookie保存完了: updated_cookies.json');
-
-  // GAS Webhook経由でスプレッドシートに送信（後で spreadsheet.js に移すことも可能）
-  if (GAS_WEBHOOK_URL) {
-    try {
-      await axios.post(GAS_WEBHOOK_URL, updatedCookies);
-      console.log('📤 Cookie情報をGASスプレッドシートに送信しました');
-    } catch (err) {
-      console.error('❌ Cookie送信失敗:', err.message);
-    }
-  }
-
-  // セッション比較ログ（あくまで旧Cookieとの差分チェック）
-  const oldSession = fixedCookies.find(c => c.name === '_src_session')?.value;
-  const newSession = updatedCookies.find(c => c.name === '_src_session')?.value;
-  if (oldSession && newSession && oldSession !== newSession) {
-    console.log('✅ セッション更新完了: 新しい _src_session が取得されました');
-  } else {
-    console.log('ℹ️ セッションIDに変更はありません');
+  try {
+    await axios.post(GAS_WEBHOOK_URL, cookies);
+    console.log('📤 Cookie情報をGASスプレッドシートに送信しました');
+  } catch (err) {
+    console.error('❌ Cookie送信失敗:', err.message);
   }
 }
 
-module.exports = { updateCookiesIfValid };
+module.exports = { saveCookies };
