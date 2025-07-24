@@ -12,41 +12,26 @@ const axios = require('axios');
 async function downloadAudioFromPage(frame) {
   console.log('🎧 音声チャレンジの音源を取得中…');
 
-  // 1) 公式のダウンロードリンク要素があればそこから
-  let audioUrl = await frame
-    .$eval('a#audio-download-link', a => a.href)
-    .catch(() => null);
-
-  // 2) なければ <audio><source> を試す
-  if (!audioUrl) {
-    console.debug('[debug] ダウンロードリンク見えず → <audio><source> から取得を試行');
-    audioUrl = await frame
-      .$eval('audio > source', el => el.src)
-      .catch(() => null);
-  }
-
-  // 3) それでもなければ <audio> タグの src を取得
-  if (!audioUrl) {
-    console.debug('[debug] <audio><source> も見えず → <audio> タグから src を試行');
-    audioUrl = await frame
-      .$eval('audio', el => el.src)
-      .catch(() => null);
-  }
-
-  if (!audioUrl) {
+  // 1) ページ内で音声 URL を抜き出し（<audio> または <audio><source>）
+  const audioUrl = await frame.evaluate(() => {
+    const audio = document.querySelector('audio');
+    if (audio && audio.src) return audio.src;
+    const source = document.querySelector('audio > source');
+    if (source && source.src) return source.src;
     throw new Error('音声チャレンジの音源 URL が取得できませんでした');
-  }
+  });
 
-  // ローカル保存先を生成
-  const tmpDir = path.resolve(__dirname, '../tmp');
-  if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
-  const fileName = `audio_${Date.now()}.mp3`;
-  const filePath = path.join(tmpDir, fileName);
+  console.log('🎧 ダウンロード開始:', audioUrl);
 
-  // バイナリ取得＆ファイル書き込み
-  const res = await axios.get(audioUrl, { responseType: 'arraybuffer' });
-  fs.writeFileSync(filePath, res.data);
-  console.log(`🎧 音声ファイルを保存しました: ${filePath}`);
+  // 2) Axios で音声を取得（arraybuffer 指定）
+  const response = await axios.get(audioUrl, { responseType: 'arraybuffer' });
+  const buffer = Buffer.from(response.data, 'binary');
+
+  // 3) 一時ディレクトリに保存
+  const filePath = path.resolve(__dirname, '../tmp/audio.mp3');
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, buffer);
+  console.log(`💾 音声ファイル保存: ${filePath}`);
 
   return filePath;
 }
