@@ -41,6 +41,7 @@ async function run() {
 
     console.log('[run] TOPページアクセス');
     await pageA.goto(sharedContext.url, { waitUntil: 'networkidle2', timeout: 0 });
+
     console.log('[run] カレンダーリンククリック');
     await Promise.all([
       pageA.click('a[href*="/calendar_apply"]'),
@@ -75,7 +76,7 @@ async function run() {
     await waitCalendar(pageA);
 
     const sequence = [
-      { action: null,      includeDate: true },
+      { action: null, includeDate: true },
       { action: nextMonth, includeDate: false },
       { action: nextMonth, includeDate: false },
       { action: prevMonth, includeDate: false },
@@ -125,7 +126,6 @@ async function run() {
     await updateCookiesIfValid(pageB);
 
     console.log('[run] 全処理完了');
-
   } catch (err) {
     console.error('⚠️ 例外発生:', err);
     await sendErrorNotification(err);
