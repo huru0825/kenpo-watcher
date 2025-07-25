@@ -77,14 +77,26 @@ async function solveRecaptcha(page) {
   await challengeFrame.click('#recaptcha-audio-button');
   console.log('[reCAPTCHA] ✅ 音声再生ダイアログ表示確認OK');
 
-  console.log('[reCAPTCHA] ▶ 再生ボタン表示確認中…');
+  const playButtonSelector = '.rc-audiochallenge-play-button button';
+  console.log('[reCAPTCHA] ▶ 再生ボタン表示確認中（状態ログあり）');
   let retries = 10;
   let playButton;
   while (retries-- > 0) {
-    playButton = await challengeFrame.$('.rc-audiochallenge-play-button button');
-    if (playButton) break;
+    const state = await challengeFrame.evaluate(selector => {
+      const el = document.querySelector(selector);
+      if (!el) return 'NOT_FOUND';
+      const style = window.getComputedStyle(el);
+      if (style.display === 'none' || style.visibility === 'hidden') return 'HIDDEN';
+      return 'VISIBLE';
+    }, playButtonSelector);
+    console.log(`[reCAPTCHA] ▶ 再生ボタン状態: ${state}（残りリトライ: ${retries}）`);
+    if (state === 'VISIBLE') {
+      playButton = await challengeFrame.$(playButtonSelector);
+      break;
+    }
     await challengeFrame.waitForTimeout(2000);
   }
+
   if (!playButton) {
     console.error('[reCAPTCHA] ❌ 再生ボタンが見つかりません');
     return false;
@@ -98,8 +110,8 @@ async function solveRecaptcha(page) {
   console.log('[reCAPTCHA] ✅ 確認ボタン表示確認OK');
 
   console.log('[reCAPTCHA] ▶ 音声再生試行');
-  await challengeFrame.waitForSelector('.rc-audiochallenge-play-button button', { timeout: 10000 });
-  await challengeFrame.click('.rc-audiochallenge-play-button button');
+  await challengeFrame.waitForSelector(playButtonSelector, { timeout: 10000, visible: true });
+  await challengeFrame.click(playButtonSelector);
   console.log('[reCAPTCHA] ✅ 音声再生OK');
 
   console.log('[reCAPTCHA] ▶ 音声ファイルの保存試行');
