@@ -78,17 +78,10 @@ async function solveRecaptcha(page) {
     const tmpDir = path.resolve(__dirname, '../tmp');
     fs.mkdirSync(tmpDir, { recursive: true });
 
-    const baseUrl = 'https://kenpo-watcher-hzdg.onrender.com';
-
     for (let i = 0; i < candidates.length; i++) {
       const btn = candidates[i];
       const label = await challengeFrame.evaluate(el => el.textContent.trim(), btn);
       const tag = label || `no-label-${i}`;
-
-      if (!label.includes('再生')) {
-        console.log(`[reCAPTCHA] ⏩ スキップ: ${i}（${tag}） → 再生ラベルなし`);
-        continue;
-      }
 
       await challengeFrame.evaluate(el => el.scrollIntoView(), btn);
       const box = await btn.boundingBox();
@@ -96,8 +89,11 @@ async function solveRecaptcha(page) {
       const fpath = path.join(tmpDir, fname);
       if (box) await btn.screenshot({ path: fpath });
 
+      const hostname = process.env.RENDER_EXTERNAL_HOSTNAME || 'localhost:10000';
+      const fullUrl = `https://${hostname}/tmp/${fname}`;
+
       console.log(`[reCAPTCHA] 🔎 ボタン${i}: ${tag} → ${box ? '📸 スクショ保存' : '❌ 不可視'}`);
-      console.log(`[reCAPTCHA] 🔗 ダウンロード: ${baseUrl}/tmp/${fname}`);
+      console.log(`[reCAPTCHA] 🔗 ダウンロード: ${fullUrl}`);
 
       try {
         await btn.click();
