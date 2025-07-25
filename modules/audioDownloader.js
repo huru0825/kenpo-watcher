@@ -2,12 +2,6 @@ const fs = require('fs');
 const path = require('path');
 const { transcribeAudio } = require('./whisper');
 
-/**
- * reCAPTCHA 音声チャレンジの音源を
- * ネットワークリスナー経由でキャッチしてダウンロード
- * @param {import('puppeteer').Frame} frame
- * @returns {Promise<string>}
- */
 async function downloadAudioFromPage(frame) {
   console.log('[reCAPTCHA] 🎧 音声チャレンジの音源をネットワーク経由でキャッチ中…');
   const page = frame.page ? frame.page() : frame._page;
@@ -30,11 +24,6 @@ async function downloadAudioFromPage(frame) {
   return filePath;
 }
 
-/**
- * ReCAPTCHA v2（音声チャレンジ）を突破する
- * @param {import('puppeteer').Page} page
- * @returns {Promise<boolean>}
- */
 async function solveRecaptcha(page) {
   console.log('[reCAPTCHA] 🔍 frames:', page.frames().map(f => f.url()));
 
@@ -83,23 +72,32 @@ async function solveRecaptcha(page) {
     await challengeFrame.waitForTimeout(2000);
   }
 
-  // 緩和＋dump試行（すべてのbuttonクリック＆スクショ）
   if (!playButton) {
     console.warn('[reCAPTCHA] ⚠️ セレクタ一致失敗 → 代替試行: 全ボタンclick+スクショへ');
     const candidates = await challengeFrame.$$('button');
     const tmpDir = path.resolve(__dirname, '../tmp');
     fs.mkdirSync(tmpDir, { recursive: true });
 
+    const baseUrl = 'https://kenpo-watcher-hzdg.onrender.com';
+
     for (let i = 0; i < candidates.length; i++) {
       const btn = candidates[i];
       const label = await challengeFrame.evaluate(el => el.textContent.trim(), btn);
-      const box = await btn.boundingBox();
       const tag = label || `no-label-${i}`;
+
+      if (!label.includes('再生')) {
+        console.log(`[reCAPTCHA] ⏩ スキップ: ${i}（${tag}） → 再生ラベルなし`);
+        continue;
+      }
+
+      await challengeFrame.evaluate(el => el.scrollIntoView(), btn);
+      const box = await btn.boundingBox();
       const fname = `btn_${i}_${Date.now()}.png`;
       const fpath = path.join(tmpDir, fname);
       if (box) await btn.screenshot({ path: fpath });
+
       console.log(`[reCAPTCHA] 🔎 ボタン${i}: ${tag} → ${box ? '📸 スクショ保存' : '❌ 不可視'}`);
-      console.log(`[reCAPTCHA] 🔗 ダウンロード: /tmp/${fname}`);
+      console.log(`[reCAPTCHA] 🔗 ダウンロード: ${baseUrl}/tmp/${fname}`);
 
       try {
         await btn.click();
