@@ -59,8 +59,9 @@ async function solveRecaptcha(page) {
 
   // ② チェックボックスをクリック
   try {
-    await checkboxFrame.waitForSelector('#recaptcha-anchor', { timeout: 10000 });
-    await checkboxFrame.click('#recaptcha-anchor');
+    // セレクターを .recaptcha-checkbox-border に変更
+    await checkboxFrame.waitForSelector('.recaptcha-checkbox-border', { timeout: 10000 });
+    await checkboxFrame.click('.recaptcha-checkbox-border');
   } catch (e) {
     console.error('❌ checkbox click failed', e);
     return false;
