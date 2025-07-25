@@ -19,6 +19,9 @@ puppeteer.use(stealth);
 const app = express();
 app.use(express.json());
 
+// /tmp 以下のファイルを静的に公開（スクショの画像など）
+app.use('/tmp', express.static(path.join(__dirname, 'tmp')));
+
 (async () => {
   // スプレッドシートから Cookie を選択（空なら null）
   const selectedCookies = await selectCookies();
