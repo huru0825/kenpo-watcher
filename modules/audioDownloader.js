@@ -65,11 +65,11 @@ async function solveRecaptcha(page) {
   );
   console.log('[reCAPTCHA][DEBUG] ボタン要素一覧:\n', allButtonsHtml);
 
-  // 現状のチャレンジUIをスクショ保存
+  // 現状のチャレンジUIをページ全体でスクショ保存
   const debugDir = path.resolve(__dirname, '../tmp');
   fs.mkdirSync(debugDir, { recursive: true });
   const debugShot = path.join(debugDir, `challenge-debug-${Date.now()}.png`);
-  await challengeFrame.screenshot({ path: debugShot, fullPage: false });
+  await page.screenshot({ path: debugShot, fullPage: true });
   console.log(`[reCAPTCHA][DEBUG] チャレンジUIスクショ: tmp/${path.basename(debugShot)}`);
   // --- デバッグロジックここまで ---
 
