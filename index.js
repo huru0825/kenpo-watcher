@@ -55,7 +55,7 @@ async function run() {
       // tmpフォルダ作成
       fs.mkdirSync('tmp', { recursive: true });
       // 失敗時に画面全体のスクリーンショットを取得
-      const screenshotPath = 'https://kenpo-watcher-hzdg.onrender.com/tmp/recaptcha-fail.png';
+      const screenshotPath = 'tmp/recaptcha-fail.png';
       await pageA.screenshot({ path: screenshotPath, fullPage: true });
       console.log(`[run] ⚠️ スクリーンショット保存: ${screenshotPath}`);
       throw new Error('reCAPTCHA 突破に失敗したため処理を中断します');
