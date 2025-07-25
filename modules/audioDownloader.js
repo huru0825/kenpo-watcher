@@ -1,5 +1,4 @@
-// modules/audioDownloader.js
-const fs = require('fs'); const path = require('path'); const { transcribeAudio } = require('./whisper');
+// modules/audioDownloader.js const fs = require('fs'); const path = require('path'); const { transcribeAudio } = require('./whisper');
 
 /**
 
