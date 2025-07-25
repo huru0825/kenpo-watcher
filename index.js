@@ -52,6 +52,10 @@ async function run() {
     const success = await solveRecaptcha(pageA);
     if (!success) {
       console.error('[run] ❌ solveRecaptcha failed: 再生ボタン未検出またはクリック不可');
+      // 失敗時に画面全体のスクリーンショットを取得
+      const screenshotPath = 'recaptcha-fail.png';
+      await pageA.screenshot({ path: screenshotPath, fullPage: true });
+      console.log(`[run] ⚠️ スクリーンショット保存: ${screenshotPath}`);
       throw new Error('reCAPTCHA 突破に失敗したため処理を中断します');
     }
 
@@ -60,7 +64,7 @@ async function run() {
     await pageA.waitForFunction(() => {
       const iframe = document.querySelector('iframe[src*="/recaptcha/api2/anchor"]');
       if (!iframe) return false;
-      const anchor = iframe?.contentDocument?.querySelector('#recaptcha-anchor');
+      const anchor = iframe.contentDocument?.querySelector('#recaptcha-anchor');
       return anchor?.getAttribute('aria-checked') === 'true';
     }, { timeout: 10000 });
 
