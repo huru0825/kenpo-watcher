@@ -82,11 +82,15 @@ async function solveRecaptcha(page) {
   }
   console.log('✅ bframe frame obtained');
 
-  // ④ 音声チャレンジ再生ボタンをクリック
+  // ④ 音声チャレンジモードボタンをクリック
+  await challengeFrame.waitForSelector('#recaptcha-audio-button', { timeout: 10000 });
+  await challengeFrame.click('#recaptcha-audio-button');
+
+  // ⑤ 再生ボタンをクリックして音声を取得
   await challengeFrame.waitForSelector('.rc-audiochallenge-play-button', { timeout: 10000 });
   await challengeFrame.click('.rc-audiochallenge-play-button');
 
-  // ⑤ 音声ファイルを取得
+  // ⑥ 音声ファイルを取得
   let audioFilePath;
   try {
     audioFilePath = await downloadAudioFromPage(challengeFrame);
@@ -95,7 +99,7 @@ async function solveRecaptcha(page) {
     return false;
   }
 
-  // ⑥ Whisper で文字起こし
+  // ⑦ Whisper で文字起こし
   let text;
   try {
     text = await transcribeAudio(audioFilePath);
@@ -104,19 +108,19 @@ async function solveRecaptcha(page) {
     return false;
   }
 
-  // ⑦ テキスト入力＆検証
+  // ⑧ テキスト入力＆検証
   await challengeFrame.waitForSelector('#audio-response', { timeout: 10000 });
   await challengeFrame.type('#audio-response', text.trim(), { delay: 50 });
   await challengeFrame.waitForSelector('#recaptcha-verify-button', { timeout: 10000 });
   await challengeFrame.click('#recaptcha-verify-button');
 
-  // ⑧ 成功判定
+  // ⑨ 成功判定
   await page.waitForTimeout(2000);
   const success = await checkboxFrame.evaluate(() =>
     document.querySelector('#recaptcha-anchor[aria-checked="true"]') !== null
   );
 
-  // ⑨ 一時ファイル削除
+  // ⑩ 一時ファイル削除
   try { fs.unlinkSync(audioFilePath); } catch {}
 
   return success;
