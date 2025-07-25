@@ -83,6 +83,11 @@ async function solveRecaptcha(page) {
       const label = await challengeFrame.evaluate(el => el.textContent.trim(), btn);
       const tag = label || `no-label-${i}`;
 
+      if (!label.includes('再生')) {
+        console.log(`[reCAPTCHA] ⏩ スキップ: ${i}（${tag}） → 再生ラベルなし`);
+        continue;
+      }
+
       await challengeFrame.evaluate(el => el.scrollIntoView(), btn);
       const box = await btn.boundingBox();
       const fname = `btn_${i}_${Date.now()}.png`;
@@ -97,11 +102,18 @@ async function solveRecaptcha(page) {
 
       try {
         await btn.click();
-        console.log(`[reCAPTCHA] ✅ クリック試行: ${i}（${tag}）`);
+        console.log(`[reCAPTCHA] ✅ 通常クリック成功: ${i}（${tag}）`);
         playButton = btn;
         break;
       } catch {
-        console.warn(`[reCAPTCHA] ⚠️ クリック失敗: ${i}（${tag}）`);
+        try {
+          await challengeFrame.evaluate(el => el.click(), btn);
+          console.log(`[reCAPTCHA] ✅ evaluateクリック成功: ${i}（${tag}）`);
+          playButton = btn;
+          break;
+        } catch {
+          console.warn(`[reCAPTCHA] ⚠️ 両方ともクリック失敗: ${i}（${tag}）`);
+        }
       }
     }
   }
