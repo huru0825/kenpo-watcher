@@ -81,7 +81,7 @@ async function solveRecaptcha(page) {
   let retries = 10;
   let playButton;
   while (retries-- > 0) {
-    playButton = await challengeFrame.$('.rc-audiochallenge-play-button');
+    playButton = await challengeFrame.$('.rc-audiochallenge-play-button button');
     if (playButton) break;
     await challengeFrame.waitForTimeout(2000);
   }
