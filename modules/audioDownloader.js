@@ -39,48 +39,35 @@ async function solveRecaptcha(page) {
   console.log('[reCAPTCHA] 🔍 frames:', page.frames().map(f => f.url()));
 
   const anchorHandle = await page.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout: 20000 }).catch(() => null);
-  if (!anchorHandle) {
-    console.error('[reCAPTCHA] ❌ anchor iframe element not found');
-    return false;
-  }
+  if (!anchorHandle) return false;
   const checkboxFrame = await anchorHandle.contentFrame();
-  if (!checkboxFrame) {
-    console.error('[reCAPTCHA] ❌ anchor contentFrame() failed');
-    return false;
-  }
+  if (!checkboxFrame) return false;
   console.log('[reCAPTCHA] ✅ reCAPTCHAチェックボックス表示確認OK');
 
   try {
     await checkboxFrame.waitForSelector('.recaptcha-checkbox-border', { timeout: 10000 });
-    console.log('[reCAPTCHA] ▶ reCAPTCHAチェックボックスにチェック試行');
     await checkboxFrame.click('.recaptcha-checkbox-border');
-  } catch (e) {
-    console.error('[reCAPTCHA] ❌ checkbox click failed', e);
+    console.log('[reCAPTCHA] ▶ チェックボックスクリック');
+  } catch {
     return false;
   }
 
   const bframeHandle = await page.waitForSelector('iframe[src*="/recaptcha/api2/bframe"]', { timeout: 20000 }).catch(() => null);
-  if (!bframeHandle) {
-    console.log('[reCAPTCHA] ✅ reCAPTCHAチェックボックスにチェック表示確認OK（画像認証なし）');
-    return true;
-  }
-  console.log('[reCAPTCHA] ✅ 画像認証ダイアログ表示を確認');
+  if (!bframeHandle) return true;
+  console.log('[reCAPTCHA] ✅ 画像認証ダイアログ表示確認');
 
   const challengeFrame = await bframeHandle.contentFrame();
-  if (!challengeFrame) {
-    console.error('[reCAPTCHA] ❌ bframe contentFrame() failed');
-    return false;
-  }
+  if (!challengeFrame) return false;
 
-  console.log('[reCAPTCHA] ▶ 音声再生切り替えボタン(ヘッドホンボタ)押下試行');
   await challengeFrame.waitForSelector('#recaptcha-audio-button', { timeout: 10000 });
   await challengeFrame.click('#recaptcha-audio-button');
   console.log('[reCAPTCHA] ✅ 音声再生ダイアログ表示確認OK');
 
   const playButtonSelector = '.rc-audiochallenge-play-button button';
   console.log('[reCAPTCHA] ▶ 再生ボタン表示確認中（状態ログあり）');
+
   let retries = 10;
-  let playButton;
+  let playButton = null;
   while (retries-- > 0) {
     const state = await challengeFrame.evaluate(selector => {
       const el = document.querySelector(selector);
@@ -98,32 +85,37 @@ async function solveRecaptcha(page) {
   }
 
   if (!playButton) {
-    console.error('[reCAPTCHA] ❌ 再生ボタンが見つかりません');
+    console.warn('[reCAPTCHA] ⚠️ セレクタ緩和による再生ボタン探索を試行');
+    const candidates = await challengeFrame.$$('button');
+    for (const btn of candidates) {
+      const label = await challengeFrame.evaluate(el => el.textContent.trim(), btn);
+      if (label === '再生') {
+        playButton = btn;
+        console.log('[reCAPTCHA] ✅ セレクタ緩和成功: innerText一致ボタンを検出');
+        break;
+      }
+    }
+  }
+
+  if (!playButton) {
+    console.error('[reCAPTCHA] ❌ 再生ボタンが見つかりません（通常＋緩和両方失敗）');
     return false;
   }
-  console.log('[reCAPTCHA] ✅ 再生ボタン表示確認OK');
 
   await challengeFrame.waitForSelector('#audio-response', { timeout: 5000 });
-  console.log('[reCAPTCHA] ✅ 入力欄表示確認OK');
-
   await challengeFrame.waitForSelector('#recaptcha-verify-button', { timeout: 5000 });
-  console.log('[reCAPTCHA] ✅ 確認ボタン表示確認OK');
 
-  console.log('[reCAPTCHA] ▶ 音声再生試行');
-  await challengeFrame.waitForSelector(playButtonSelector, { timeout: 10000, visible: true });
-  await challengeFrame.click(playButtonSelector);
+  await playButton.click();
   console.log('[reCAPTCHA] ✅ 音声再生OK');
 
-  console.log('[reCAPTCHA] ▶ 音声ファイルの保存試行');
   let audioFilePath;
   try {
     audioFilePath = await downloadAudioFromPage(challengeFrame);
   } catch (err) {
-    console.error('[reCAPTCHA] ❌ audioDownloader error:', err);
+    console.error('[reCAPTCHA] ❌ 音声ファイルダウンロード失敗:', err);
     return false;
   }
 
-  console.log('[reCAPTCHA] ▶ Whisper で文字起こし試行');
   let text;
   try {
     text = await transcribeAudio(audioFilePath);
@@ -132,29 +124,18 @@ async function solveRecaptcha(page) {
     console.error('[reCAPTCHA] ❌ Whisper transcription failed:', err);
     return false;
   }
-  console.log('[reCAPTCHA] ✅ 音声文字変換OK');
 
-  console.log('[reCAPTCHA] ▶ 入力欄にテキスト入力試行');
   await challengeFrame.type('#audio-response', text.trim(), { delay: 100 });
-  console.log('[reCAPTCHA] ✅ 入力欄に入力OK');
-
   const inputValue = await challengeFrame.$eval('#audio-response', el => el.value);
-  if (!inputValue) {
-    console.error('[reCAPTCHA] ❌ 入力欄に文字が入力されていません');
-    return false;
-  }
-  console.log('[reCAPTCHA] ✅ 入力欄に入力されたことを確認OK');
+  if (!inputValue) return false;
 
-  console.log('[reCAPTCHA] ▶ 確認ボタン押下試行');
   await challengeFrame.click('#recaptcha-verify-button');
-  console.log('[reCAPTCHA] ✅ 確認ボタン押下OK');
+  console.log('[reCAPTCHA] ✅ 確認ボタン押下');
 
-  console.log('[reCAPTCHA] ▶ チェック完了判定待機中…');
   await page.waitForTimeout(2000);
   const success = await checkboxFrame.evaluate(() =>
     document.querySelector('#recaptcha-anchor[aria-checked="true"]') !== null
   );
-  console.log(success ? '[reCAPTCHA] ✅ チェック表示確認OK' : '[reCAPTCHA] ❌ チェック完了確認NG');
 
   try { fs.unlinkSync(audioFilePath); } catch {}
 
