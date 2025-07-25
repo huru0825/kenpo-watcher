@@ -66,9 +66,8 @@ async function solveRecaptcha(page) {
   const playButtonSelector = '.rc-audiochallenge-play-button button';
   console.log('[reCAPTCHA] ▶ 再生ボタン表示確認中（状態ログあり）');
 
-  let retries = 10;
   let playButton = null;
-  while (retries-- > 0) {
+  for (let i = 0; i < 10; i++) {
     const state = await challengeFrame.evaluate(selector => {
       const el = document.querySelector(selector);
       if (!el) return 'NOT_FOUND';
@@ -76,7 +75,7 @@ async function solveRecaptcha(page) {
       if (style.display === 'none' || style.visibility === 'hidden') return 'HIDDEN';
       return 'VISIBLE';
     }, playButtonSelector);
-    console.log(`[reCAPTCHA] ▶ 再生ボタン状態: ${state}（残りリトライ: ${retries}）`);
+    console.log(`[reCAPTCHA] ▶ 再生ボタン状態: ${state}（リトライ: ${9 - i}）`);
     if (state === 'VISIBLE') {
       playButton = await challengeFrame.$(playButtonSelector);
       break;
@@ -84,21 +83,37 @@ async function solveRecaptcha(page) {
     await challengeFrame.waitForTimeout(2000);
   }
 
+  // 緩和＋dump試行（すべてのbuttonクリック＆スクショ）
   if (!playButton) {
-    console.warn('[reCAPTCHA] ⚠️ セレクタ緩和による再生ボタン探索を試行');
+    console.warn('[reCAPTCHA] ⚠️ セレクタ一致失敗 → 代替試行: 全ボタンclick+スクショへ');
     const candidates = await challengeFrame.$$('button');
-    for (const btn of candidates) {
+    const tmpDir = path.resolve(__dirname, '../tmp');
+    fs.mkdirSync(tmpDir, { recursive: true });
+
+    for (let i = 0; i < candidates.length; i++) {
+      const btn = candidates[i];
       const label = await challengeFrame.evaluate(el => el.textContent.trim(), btn);
-      if (label === '再生') {
+      const box = await btn.boundingBox();
+      const tag = label || `no-label-${i}`;
+      const fname = `btn_${i}_${Date.now()}.png`;
+      const fpath = path.join(tmpDir, fname);
+      if (box) await btn.screenshot({ path: fpath });
+      console.log(`[reCAPTCHA] 🔎 ボタン${i}: ${tag} → ${box ? '📸 スクショ保存' : '❌ 不可視'}`);
+      console.log(`[reCAPTCHA] 🔗 ダウンロード: /tmp/${fname}`);
+
+      try {
+        await btn.click();
+        console.log(`[reCAPTCHA] ✅ クリック試行: ${i}（${tag}）`);
         playButton = btn;
-        console.log('[reCAPTCHA] ✅ セレクタ緩和成功: innerText一致ボタンを検出');
         break;
+      } catch {
+        console.warn(`[reCAPTCHA] ⚠️ クリック失敗: ${i}（${tag}）`);
       }
     }
   }
 
   if (!playButton) {
-    console.error('[reCAPTCHA] ❌ 再生ボタンが見つかりません（通常＋緩和両方失敗）');
+    console.error('[reCAPTCHA] ❌ 再生ボタンが見つかりません（全手法失敗）');
     return false;
   }
 
