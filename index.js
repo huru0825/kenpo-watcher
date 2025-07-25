@@ -7,7 +7,6 @@ const { waitCalendar, nextMonth, prevMonth } = require('./modules/navigate');
 const { visitMonth } = require('./modules/visitMonth');
 const { sendNotification, sendNoVacancyNotice, sendErrorNotification } = require('./modules/notifier');
 const { updateCookiesIfValid, saveCookies } = require('./modules/cookieUpdater');
-// ✏️ CHANGED: recaptchaSolver を読み込み
 const { solveRecaptcha } = require('./modules/audioDownloader');
 const { INDEX_URL, TARGET_FACILITY_NAME } = require('./modules/constants');
 
@@ -28,13 +27,11 @@ async function run() {
   try {
     console.log('[run] 実行開始');
 
-    // — Aブラウザ起動・初期設定 —
     browserA = await launchBrowser();
     const pageA = await browserA.newPage();
     await pageA.setUserAgent(sharedContext.userAgent);
     await pageA.setExtraHTTPHeaders(sharedContext.headers);
 
-    // Cookie注入（シートにあれば）
     if (sharedContext.cookies?.length) {
       console.log('[run] スプレッドシートから Cookie 注入');
       await pageA.setCookie(...sharedContext.cookies);
@@ -42,7 +39,6 @@ async function run() {
       console.log('[run] シートにCookieなし → Cookie注入スキップ');
     }
 
-    // — TOPページアクセス & カレンダー申込ページへの遷移 —
     console.log('[run] TOPページアクセス');
     await pageA.goto(sharedContext.url, { waitUntil: 'networkidle2', timeout: 0 });
     console.log('[run] カレンダーリンククリック');
@@ -51,26 +47,24 @@ async function run() {
       pageA.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout: 60000 })
     ]);
 
-    // — reCAPTCHA 突破開始 —
     console.log('[run] reCAPTCHA 突破開始');
-    const bypassed = await solveRecaptcha(pageA);
-    if (!bypassed) {
+    const success = await solveRecaptcha(pageA);
+    if (!success) {
+      console.error('[run] ❌ solveRecaptcha failed: 再生ボタン未検出またはクリック不可');
       throw new Error('reCAPTCHA 突破に失敗したため処理を中断します');
     }
+
     console.log('[run] ✅ reCAPTCHA bypass succeeded');
-    // 突破後、チェックボックスにチェックが入るまで待機
-    await pageA.waitForFunction(
-      () => {
-        const frame = document.querySelector('iframe[src*="/recaptcha/api2/anchor"]');
-        if (!frame) return false;
-        const doc = frame.contentWindow.document;
-        return !!doc.querySelector('#recaptcha-anchor[aria-checked="true"], .recaptcha-checkbox-checked');
-      },
-      { timeout: 10000 }
-    );
+
+    await pageA.waitForFunction(() => {
+      const iframe = document.querySelector('iframe[src*="/recaptcha/api2/anchor"]');
+      if (!iframe) return false;
+      const anchor = iframe?.contentDocument?.querySelector('#recaptcha-anchor');
+      return anchor?.getAttribute('aria-checked') === 'true';
+    }, { timeout: 10000 });
+
     console.log('[run] reCAPTCHA チェック確認済み');
 
-    // — 「次へ」ボタン押下＆カレンダー待機 —
     console.log('[run] 「次へ」ボタン押下＆カレンダー待機');
     await Promise.all([
       pageA.waitForResponse(r =>
@@ -80,7 +74,6 @@ async function run() {
     ]);
     await waitCalendar(pageA);
 
-    // — 月巡回シーケンス & 通知 —
     const sequence = [
       { action: null,      includeDate: true },
       { action: nextMonth, includeDate: false },
@@ -106,7 +99,6 @@ async function run() {
       await sendNoVacancyNotice();
     }
 
-    // ✏️ CHANGED: シートが空なら最新Cookieを保存
     if (!sharedContext.cookies?.length) {
       console.log('[run] シート空 → 現行Cookieを保存');
       const current = await pageA.cookies();
@@ -116,7 +108,6 @@ async function run() {
     await browserA.close();
     browserA = null;
 
-    // — BブラウザでCookie更新 —
     console.log('[run] Bブラウザ起動（Cookie更新）');
     browserB = await launchBrowser();
     const pageB = await browserB.newPage();
@@ -145,7 +136,6 @@ async function run() {
   }
 }
 
-// Warmup（cold start 回避）
 async function warmup() {
   const browser = await launchBrowser();
   await browser.close();
