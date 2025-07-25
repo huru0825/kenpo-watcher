@@ -59,7 +59,7 @@ async function solveRecaptcha(page) {
   // --- ここからデバッグロジックを追加 ---
   // ボタンの outerHTML をログ出力
   const allButtonsHtml = await challengeFrame.evaluate(() =>
-    Array.from(document.querySelectorAll('button'))
+    Array.from(document.querySelectorAll('[role="button"], .rc-audiochallenge-play-button, [tabindex="0"]'))
       .map(b => b.outerHTML)
       .join('\n\n')
   );
