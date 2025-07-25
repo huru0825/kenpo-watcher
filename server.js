@@ -7,12 +7,14 @@ const {
   GAS_WEBHOOK_URL,
   INDEX_URL
 } = require('./modules/constants');
-
 const { selectCookies } = require('./modules/cookieSelector');
 
+// puppeteer-extra + stealth plugin 導入
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-puppeteer.use(StealthPlugin());
+const stealth = StealthPlugin();
+stealth.enabledEvasions.delete('iframe.contentWindow'); // オプション：reCAPTCHA安定化用
+puppeteer.use(stealth);
 
 const app = express();
 app.use(express.json());
@@ -37,7 +39,7 @@ app.use(express.json());
     },
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/115.0.0.0 Safari/537.36',
     headers: { 'Accept-Language': 'ja-JP,ja;q=0.9' },
-    cookies: selectedCookies,    // 固定Cookieは投入せず、シートのものだけ
+    cookies: selectedCookies,
     url: INDEX_URL,
     webhookUrl: GAS_WEBHOOK_URL
   });
