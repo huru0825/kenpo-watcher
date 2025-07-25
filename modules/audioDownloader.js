@@ -41,15 +41,23 @@ async function solveRecaptcha(page) {
   // デバッグ: 現在ロードされているフレーム一覧を出力
   console.log('🔍 frames:', page.frames().map(f => f.url()));
 
-  // ① anchor フレーム検出
-  const checkboxFrame = page.frames().find(f => f.url().includes('/recaptcha/api2/anchor'));
-  if (!checkboxFrame) {
-    console.error('❌ anchor frame not found');
+  // ① anchor iframe 要素を DOM から取得
+  const anchorHandle = await page.waitForSelector(
+    'iframe[src*="/recaptcha/api2/anchor"]',
+    { timeout: 20000 }
+  ).catch(() => null);
+  if (!anchorHandle) {
+    console.error('❌ anchor iframe element not found');
     return false;
   }
-  console.log('✅ anchor frame found:', checkboxFrame.url());
+  const checkboxFrame = await anchorHandle.contentFrame();
+  if (!checkboxFrame) {
+    console.error('❌ anchor contentFrame() failed');
+    return false;
+  }
+  console.log('✅ anchor frame obtained');
 
-  // ② チェックボックスクリック
+  // ② チェックボックスをクリック
   try {
     await checkboxFrame.waitForSelector('#recaptcha-anchor', { timeout: 10000 });
     await checkboxFrame.click('#recaptcha-anchor');
@@ -58,17 +66,24 @@ async function solveRecaptcha(page) {
     return false;
   }
 
-  // ③ bframe 検出
-  await page.waitForTimeout(1000);
-  const challengeFrame = page.frames().find(f => f.url().includes('/recaptcha/api2/bframe'));
-  if (!challengeFrame) {
-    console.error('❌ bframe not found');
+  // ③ bframe iframe 要素を DOM から取得
+  const bframeHandle = await page.waitForSelector(
+    'iframe[src*="/recaptcha/api2/bframe"]',
+    { timeout: 20000 }
+  ).catch(() => null);
+  if (!bframeHandle) {
+    console.error('❌ bframe iframe element not found');
     return false;
   }
-  console.log('✅ bframe found:', challengeFrame.url());
+  const challengeFrame = await bframeHandle.contentFrame();
+  if (!challengeFrame) {
+    console.error('❌ bframe contentFrame() failed');
+    return false;
+  }
+  console.log('✅ bframe frame obtained');
 
   // ④ 音声チャレンジ再生ボタンをクリック
-  await challengeFrame.waitForSelector('.rc-audiochallenge-play-button', { timeout: 5000 });
+  await challengeFrame.waitForSelector('.rc-audiochallenge-play-button', { timeout: 10000 });
   await challengeFrame.click('.rc-audiochallenge-play-button');
 
   // ⑤ 音声ファイルを取得
@@ -90,9 +105,9 @@ async function solveRecaptcha(page) {
   }
 
   // ⑦ テキスト入力＆検証
-  await challengeFrame.waitForSelector('#audio-response', { timeout: 5000 });
+  await challengeFrame.waitForSelector('#audio-response', { timeout: 10000 });
   await challengeFrame.type('#audio-response', text.trim(), { delay: 50 });
-  await challengeFrame.waitForSelector('#recaptcha-verify-button', { timeout: 5000 });
+  await challengeFrame.waitForSelector('#recaptcha-verify-button', { timeout: 10000 });
   await challengeFrame.click('#recaptcha-verify-button');
 
   // ⑧ 成功判定
