@@ -13,8 +13,11 @@ reCAPTCHA 音声チャレンジの音源を
 
 const audioResponse = await page.waitForResponse( res => res.url().includes('/recaptcha/api2/payload') && res.headers()['content-type']?.includes('audio/mp3'), { timeout: 10000 } ); const audioBuffer = await audioResponse.buffer();
 
-const tmpDir = path.resolve(__dirname, '../tmp'); fs.mkdirSync(tmpDir, { recursive: true }); const filePath = path.join(tmpDir, audio_${Date.now()}.mp3); fs.writeFileSync(filePath, audioBuffer); console.log([reCAPTCHA] ✅ 音声ファイル保存完了: ${filePath});
+const tmpDir = path.resolve(__dirname, '../tmp'); fs.mkdirSync(tmpDir, { recursive: true }); 
+const filePath = path.join(tmpDir, `audio_${Date.now()}.mp3`);fs.writeFileSync(filePath, audioBuffer); console.log([reCAPTCHA] ✅ 音声ファイル保存完了: ${filePath});
 
+
+                                                                           
 return filePath; }
 
 /**
