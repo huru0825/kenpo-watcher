@@ -6,7 +6,7 @@ const {
   CHROME_PATH,
   GAS_WEBHOOK_URL,
   INDEX_URL,
-+  BASE_URL
+  BASE_URL
 } = require('./modules/constants');
 const { selectCookies } = require('./modules/cookieSelector');
 
