@@ -5,7 +5,8 @@ const { run, warmup, setSharedContext } = require('./index');
 const {
   CHROME_PATH,
   GAS_WEBHOOK_URL,
-  INDEX_URL
+  INDEX_URL,
++  BASE_URL
 } = require('./modules/constants');
 const { selectCookies } = require('./modules/cookieSelector');
 
@@ -51,24 +52,29 @@ app.use('/tmp', express.static(path.join(__dirname, 'tmp')));
   app.get('/health', (req, res) => res.send('OK'));
 
   // CRON トリガー（GET/POST 共通）
-  app.get('/run', async (req, res) => {
+  const handleRun = async (req, res) => {
     try {
-      await run();
+      // run() は { screenshotPaths: [ '/…/tmp/xxx.png', … ] } を返す想定
+      const result = await run();
+
+      if (result && Array.isArray(result.screenshotPaths)) {
+        result.screenshotPaths.forEach(fullPath => {
+          const fileName = path.basename(fullPath);
+          const publicUrl = `${BASE_URL}/tmp/${fileName}`;
+          console.log(`[server] Screenshot URL: ${publicUrl}`);
+        });
+      }
+
       res.sendStatus(204);
     } catch (err) {
-      console.error('💥 /run error:', err);
+      console.error('💥 /run error:', err.message);
+      console.error(err.stack);
       res.sendStatus(500);
     }
-  });
-  app.post('/run', async (req, res) => {
-    try {
-      await run();
-      res.sendStatus(204);
-    } catch (err) {
-      console.error('💥 /run error:', err);
-      res.sendStatus(500);
-    }
-  });
+  };
+
+  app.get('/run',  handleRun);
+  app.post('/run', handleRun);
 
   // ポートバインド＋Warmup
   const port = process.env.PORT || 10000;
