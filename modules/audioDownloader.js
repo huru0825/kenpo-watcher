@@ -113,13 +113,54 @@ async function solveRecaptcha(page) {
     return false;
   }
 
-  // 7. （ここから先はまだ未到達）
-  // — 音声ファイルダウンロード → transcribeAudio() → challengeFrame.type() → verify など
+  // 7. 音声ファイルダウンロードを試行
+  console.log('[reCAPTCHA] ▶ 音声ファイルダウンロードを試行');
+  let audioFilePath;
+  try {
+    audioFilePath = await downloadAudioFromPage(challengeFrame);
+    console.log('[reCAPTCHA] ✅ 音声ファイルダウンロード成功');
+  } catch (err) {
+    console.error('[reCAPTCHA] ❌ 音声ファイルダウンロード失敗:', err);
+    return false;
+  }
 
-  return false;
+  // 8. Whisper で文字起こし
+  let text;
+  try {
+    text = await transcribeAudio(audioFilePath);
+    console.log('📝 認識結果:', text);
+  } catch (err) {
+    console.error('[reCAPTCHA] ❌ Whisper transcription failed:', err);
+    return false;
+  }
+
+  // 9. テキスト入力＆検証
+  console.log('[reCAPTCHA] ▶ テキスト入力を試行');
+  await challengeFrame.type('#audio-response', text.trim(), { delay: 100 });
+  const inputValue = await challengeFrame.$eval('#audio-response', el => el.value);
+  if (!inputValue) {
+    console.error('[reCAPTCHA] ❌ テキスト入力失敗');
+    return false;
+  }
+  console.log('[reCAPTCHA] ✅ テキスト入力成功');
+
+  await challengeFrame.click('#recaptcha-verify-button');
+  console.log('[reCAPTCHA] ✅ 確認ボタン押下');
+
+  // 10. 結果確認
+  await page.waitForTimeout(2000);
+  const success = await checkboxFrame.evaluate(() =>
+    document.querySelector('#recaptcha-anchor[aria-checked="true"]') !== null
+  );
+
+  // 11. 一時ファイル削除
+  try { fs.unlinkSync(audioFilePath); } catch {}
+
+  return success;
 }
 
 module.exports = {
   downloadAudioFromPage,
   solveRecaptcha
 };
+```0
