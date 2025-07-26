@@ -56,24 +56,19 @@ async function solveRecaptcha(page) {
   const challengeFrame = await bframeHandle.contentFrame();
   if (!challengeFrame) return false;
 
-  // --- ここからデバッグロジックを追加 ---
-  // ボタンの outerHTML をログ出力
+  // --- デバッグ: 旧 UI のボタン一覧 & スクショ ---
   const allButtonsHtml = await challengeFrame.evaluate(() =>
-    Array.from(document.querySelectorAll('button'))
-      .map(b => b.outerHTML)
-      .join('\n\n')
+    Array.from(document.querySelectorAll('button')).map(b => b.outerHTML).join('\n\n')
   );
   console.log('[reCAPTCHA][DEBUG] ボタン要素一覧:\n', allButtonsHtml);
 
-  // 現状のチャレンジUIをページ全体でスクショ保存
   const debugDir = path.resolve(__dirname, '../tmp');
   fs.mkdirSync(debugDir, { recursive: true });
-  const debugShot = path.join(debugDir, `challenge-debug-${Date.now()}.png`);
-  await page.screenshot({ path: debugShot, fullPage: true });
-  console.log(`[reCAPTCHA][DEBUG] チャレンジUIスクショ: tmp/${path.basename(debugShot)}`);
-  // --- デバッグロジックここまで ---
+  const debugShot1 = path.join(debugDir, `challenge-debug-${Date.now()}.png`);
+  await page.screenshot({ path: debugShot1, fullPage: true });
+  console.log(`[reCAPTCHA][DEBUG] 画像認証画面スクショ: tmp/${path.basename(debugShot1)}`);
 
-  // 4. 新版セレクタで Play ボタンを探す
+  // 4. 新版セレクタ or フォールバックで Play ボタンを探す
   console.log('[reCAPTCHA] ▶ 新版セレクタで再生ボタンを探しています');
   let playButton = await challengeFrame.$('#recaptcha-audio-button')
     || await challengeFrame.$('button[aria-label="Play audio challenge"]');
@@ -81,7 +76,6 @@ async function solveRecaptcha(page) {
   if (playButton) {
     console.log('[reCAPTCHA] 🔎 新版セレクタ検出: ', await challengeFrame.evaluate(el => el.outerHTML, playButton));
   } else {
-    // 旧来の「再生」「play」をラベルに含む動的検出へフォールバック
     console.log('[reCAPTCHA] ▶ 動的ラベル検出にフォールバック');
     const buttons = await challengeFrame.$$('button');
     for (const btn of buttons) {
@@ -104,10 +98,17 @@ async function solveRecaptcha(page) {
     return false;
   }
 
-  // 5. 再生ボタンをクリックし、音声ファイルを取得
+  // 5. 再生ボタンをクリック
   await playButton.click();
   console.log('[reCAPTCHA] ✅ 音声再生ボタンクリック');
 
+  // --- デバッグ: 再生後の音声チャレンジ画面スクショ ---
+  const debugShot2 = path.join(debugDir, `audio-challenge-${Date.now()}.png`);
+  await page.waitForTimeout(500); // 遷移待ち
+  await page.screenshot({ path: debugShot2, fullPage: true });
+  console.log(`[reCAPTCHA][DEBUG] 音声チャレンジ画面スクショ: tmp/${path.basename(debugShot2)}`);
+
+  // 6. 音声ファイルを取得
   let audioFilePath;
   try {
     audioFilePath = await downloadAudioFromPage(challengeFrame);
@@ -116,7 +117,7 @@ async function solveRecaptcha(page) {
     return false;
   }
 
-  // 6. Whisper で文字起こし
+  // 7. Whisper で文字起こし
   let text;
   try {
     text = await transcribeAudio(audioFilePath);
@@ -126,7 +127,7 @@ async function solveRecaptcha(page) {
     return false;
   }
 
-  // 7. テキスト入力＆検証
+  // 8. テキスト入力＆検証
   await challengeFrame.type('#audio-response', text.trim(), { delay: 100 });
   const inputValue = await challengeFrame.$eval('#audio-response', el => el.value);
   if (!inputValue) return false;
@@ -134,16 +135,14 @@ async function solveRecaptcha(page) {
   await challengeFrame.click('#recaptcha-verify-button');
   console.log('[reCAPTCHA] ✅ 確認ボタン押下');
 
-  // 8. 結果確認
+  // 9. 結果確認
   await page.waitForTimeout(2000);
   const success = await checkboxFrame.evaluate(() =>
     document.querySelector('#recaptcha-anchor[aria-checked="true"]') !== null
   );
 
-  // 9. 一時ファイル削除
-  try {
-    fs.unlinkSync(audioFilePath);
-  } catch {}
+  // 10. 一時ファイル削除
+  try { fs.unlinkSync(audioFilePath); } catch {}
 
   return success;
 }
