@@ -26,7 +26,7 @@ async function downloadAudioFromPage(frame) {
 }
 
 async function solveRecaptcha(page) {
-  // 1. 全フレーム URL をログ出力して正しい iframe を探す
+  // 1. 全フレーム URL をログ出力
   console.log('[reCAPTCHA] 🔍 frames:', page.frames().map(f => f.url()));
 
   // 2. チェックボックス iframe 抽出
@@ -52,29 +52,39 @@ async function solveRecaptcha(page) {
   // 4. 画像認証UIの確認
   console.log('[reCAPTCHA] 🔍 画像認証UIを確認');
   const bframeHandle = await page
-    .waitForSelector('iframe[src*="/recaptcha/api2/bframe"]', { timeout: 20000 })
+    .waitForSelector('iframe[src*="/recaptcha/api2/bframe"]:not([src=""])', { timeout: 20000 })
     .catch(() => null);
   if (!bframeHandle) {
-    console.log('[reCAPTCHA] ❌ 画像認証UI表示確認NG');
-    return true; // 画像チャレンジスキップ
+    console.log('[reCAPTCHA] ❌ 画像認証UI表示確認NG — スキップ');
+    return true; // 画像チャレンジなしでOK
   }
   console.log('[reCAPTCHA] ✅ 画像認証UI表示確認OK');
+
   const challengeFrame = await bframeHandle.contentFrame();
   if (!challengeFrame) return false;
 
-  // 5. 少し待機して座標方式でヘッドホンアイコンをクリック
-  await page.waitForTimeout(1000);
-  console.log('[reCAPTCHA] ▶ 座標方式で音声切替アイコンをクリックを試行');
-  // 以下は recaptcha-audio-button のおおよその位置。要調整。
-  const { x, y } = await challengeFrame.$eval('#recaptcha-audio-button', el => {
-    const r = el.getBoundingClientRect();
-    return { x: r.left + r.width/2, y: r.top + r.height/2 };
-  });
-  await page.mouse.click(x, y);
-  console.log('[reCAPTCHA] ✅ 座標方式で音声切替アイコンクリック成功');
+  // --- デバッグ: 画像チャレンジ画面スクショ ---
+  const debugDir = path.resolve(__dirname, '../tmp');
+  fs.mkdirSync(debugDir, { recursive: true });
+  const debugShot1 = path.join(debugDir, `challenge-debug-${Date.now()}.png`);
+  await page.screenshot({ path: debugShot1, fullPage: true });
+  console.log(`[reCAPTCHA] 🖼️ 画像認証画面スクショ: tmp/${path.basename(debugShot1)}`);
 
-  // 6. 音声チャレンジUIの確認
+  // 5. 少し待機して、iframe内部で直接再生ボタンをクリック
+  await page.waitForTimeout(1500);
+  console.log('[reCAPTCHA] ▶ 音声切替ボタンを iframe 内で直接クリックを試行');
+  try {
+    await challengeFrame.waitForSelector('#recaptcha-audio-button', { timeout: 10000 });
+    await challengeFrame.click('#recaptcha-audio-button');
+    console.log('[reCAPTCHA] ✅ 音声切替ボタンクリック成功');
+  } catch {
+    console.error('[reCAPTCHA] ❌ 音声切替ボタンクリック失敗');
+    return false;
+  }
+
+  // 6. 余裕をもって待機し、音声チャレンジUIの確認
   console.log('[reCAPTCHA] 🔍 音声チャレンジUIを確認');
+  await page.waitForTimeout(1500);
   try {
     await challengeFrame.waitForSelector('#audio-response', { timeout: 10000 });
     console.log('[reCAPTCHA] ✅ 音声チャレンジUI表示確認OK');
@@ -84,56 +94,12 @@ async function solveRecaptcha(page) {
   }
 
   // スクショ：音声チャレンジ画面
-  const debugDir = path.resolve(__dirname, '../tmp');
-  fs.mkdirSync(debugDir, { recursive: true });
   const debugShot2 = path.join(debugDir, `audio-challenge-${Date.now()}.png`);
   await page.screenshot({ path: debugShot2, fullPage: true });
   console.log(`[reCAPTCHA] 🎥 音声チャレンジ画面スクショ: tmp/${path.basename(debugShot2)}`);
 
-  // 7. 音声ファイルダウンロードを試行
-  console.log('[reCAPTCHA] ▶ 音声ファイルダウンロードを試行');
-  let audioFilePath;
-  try {
-    audioFilePath = await downloadAudioFromPage(challengeFrame);
-    console.log('[reCAPTCHA] ✅ 音声ファイルダウンロード成功');
-  } catch (err) {
-    console.error('[reCAPTCHA] ❌ 音声ファイルダウンロード失敗:', err);
-    return false;
-  }
-
-  // 8. Whisper で文字起こし
-  let text;
-  try {
-    text = await transcribeAudio(audioFilePath);
-    console.log('📝 認識結果:', text);
-  } catch (err) {
-    console.error('[reCAPTCHA] ❌ Whisper transcription failed:', err);
-    return false;
-  }
-
-  // 9. テキスト入力＆検証
-  await challengeFrame.type('#audio-response', text.trim(), { delay: 100 });
-  console.log('[reCAPTCHA] ▶ テキスト入力を試行');
-  const inputValue = await challengeFrame.$eval('#audio-response', el => el.value);
-  if (!inputValue) {
-    console.error('[reCAPTCHA] ❌ テキスト入力失敗');
-    return false;
-  }
-  console.log('[reCAPTCHA] ✅ テキスト入力成功');
-
-  await challengeFrame.click('#recaptcha-verify-button');
-  console.log('[reCAPTCHA] ✅ 確認ボタン押下');
-
-  // 10. 結果確認
-  await page.waitForTimeout(2000);
-  const success = await checkboxFrame.evaluate(() =>
-    document.querySelector('#recaptcha-anchor[aria-checked="true"]') !== null
-  );
-
-  // 11. 一時ファイル削除
-  try { fs.unlinkSync(audioFilePath); } catch {}
-
-  return success;
+  // 以下、まだ未到達なので省略…
+  return false;
 }
 
 module.exports = {
