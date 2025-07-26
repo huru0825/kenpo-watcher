@@ -61,17 +61,12 @@ async function solveRecaptcha(page) {
   const challengeFrame = await bframeHandle.contentFrame();
   if (!challengeFrame) return false;
 
-  // --- デバッグ: 旧 UI のボタン一覧 & スクショ ---
-  const allButtonsHtml = await challengeFrame.evaluate(() =>
-    Array.from(document.querySelectorAll('button')).map(b => b.outerHTML).join('\n\n')
-  );
-  console.log('[reCAPTCHA][DEBUG] ボタン要素一覧:\n', allButtonsHtml);
-
+  // スクショ：画像認証画面
   const debugDir = path.resolve(__dirname, '../tmp');
   fs.mkdirSync(debugDir, { recursive: true });
-  const debugShot1 = path.join(debugDir, `challenge-debug-${Date.now()}.png`);
-  await page.screenshot({ path: debugShot1, fullPage: true });
-  console.log(`[reCAPTCHA][DEBUG] 画像認証画面スクショ: tmp/${path.basename(debugShot1)}`);
+  const shot1 = path.join(debugDir, `challenge-debug-${Date.now()}.png`);
+  await page.screenshot({ path: shot1, fullPage: true });
+  console.log(`[reCAPTCHA] 🎥 画像認証画面スクショ: tmp/${path.basename(shot1)}`);
 
   // 5. 音声切替ボタンの確認
   console.log('[reCAPTCHA] 🔍 音声切替ボタンを確認');
@@ -82,9 +77,18 @@ async function solveRecaptcha(page) {
     : '[reCAPTCHA] ❌ 音声切替ボタン表示確認NG');
   if (!playButton) return false;
 
-  // 6. 音声切替ボタンをクリック
-  console.log('[reCAPTCHA] ▶ 音声切替ボタンクリックを試行');
-  await playButton.click();
+  // 6. 座標方式で音声切替ボタンをクリック
+  console.log('[reCAPTCHA] ▶ 音声切替ボタンクリックを試行 (boundingBox)');
+  const box = await playButton.boundingBox();
+  if (!box) {
+    console.error('[reCAPTCHA] ❌ ボタン座標取得失敗');
+    return false;
+  }
+  // フレームをまたいでも正しくクリックするために page.mouse を使用
+  await page.mouse.click(
+    box.x + box.width / 2,
+    box.y + box.height / 2
+  );
   console.log('[reCAPTCHA] ✅ 音声切替ボタンクリック成功');
 
   // 7. 音声チャレンジUIの確認
@@ -98,9 +102,9 @@ async function solveRecaptcha(page) {
   }
 
   // スクショ：音声チャレンジ画面
-  const debugShot2 = path.join(debugDir, `audio-challenge-${Date.now()}.png`);
-  await page.screenshot({ path: debugShot2, fullPage: true });
-  console.log(`[reCAPTCHA] 🎥 音声チャレンジ画面スクショ: tmp/${path.basename(debugShot2)}`);
+  const shot2 = path.join(debugDir, `audio-challenge-${Date.now()}.png`);
+  await page.screenshot({ path: shot2, fullPage: true });
+  console.log(`[reCAPTCHA] 🎥 音声チャレンジ画面スクショ: tmp/${path.basename(shot2)}`);
 
   // 8. 音声ファイルダウンロードを試行
   console.log('[reCAPTCHA] ▶ 音声ファイルダウンロードを試行');
@@ -147,3 +151,4 @@ module.exports = {
   downloadAudioFromPage,
   solveRecaptcha
 };
+```0
