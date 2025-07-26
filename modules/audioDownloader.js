@@ -26,8 +26,10 @@ async function downloadAudioFromPage(frame) {
 }
 
 async function solveRecaptcha(page) {
-  // 1–2. チェックボックスiframe取得＆クリック（既存）
+  // 1. 全フレーム URL をログ出力
   console.log('[reCAPTCHA] 🔍 frames:', page.frames().map(f => f.url()));
+
+  // 2. チェックボックス iframe 抽出
   const anchorHandle = await page
     .waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout: 20000 })
     .catch(() => null);
@@ -36,6 +38,7 @@ async function solveRecaptcha(page) {
   if (!checkboxFrame) return false;
   console.log('[reCAPTCHA] ✅ reCAPTCHAチェックボックス表示確認OK');
 
+  // 3. チェックボックスクリック
   console.log('[reCAPTCHA] ▶ チェックボックスクリックを試行');
   try {
     await checkboxFrame.waitForSelector('.recaptcha-checkbox-border', { timeout: 10000 });
@@ -46,71 +49,56 @@ async function solveRecaptcha(page) {
     return false;
   }
 
-  // 3–4. 画像認証UI取得＆スクショ（既存）
+  // 4. 画像認証UIの確認（元のロジックに戻す）
   console.log('[reCAPTCHA] 🔍 画像認証UIを確認');
-  await page.waitForTimeout(500);
-  const bframeHandle = page.frames().find(f => f.url().includes('/recaptcha/api2/bframe'));
+  const bframeHandle = await page
+    .waitForSelector('iframe[src*="/recaptcha/api2/bframe"]:not([src=""])', { timeout: 20000 })
+    .catch(() => null);
   if (!bframeHandle) {
-    console.log('[reCAPTCHA] ❌ 画像認証UI表示確認NG — スキップ'); 
-    return true;  // 画像チャレンジなしでOK
+    console.log('[reCAPTCHA] ❌ 画像認証UI表示確認NG — スキップ');
+    return true; // 画像チャレンジなしでOK
   }
   console.log('[reCAPTCHA] ✅ 画像認証UI表示確認OK');
+
   const challengeFrame = await bframeHandle.contentFrame();
   if (!challengeFrame) return false;
 
-  // デバッグ用スクショ
+  // --- デバッグ: 画像認証画面スクショ ---
   const debugDir = path.resolve(__dirname, '../tmp');
   fs.mkdirSync(debugDir, { recursive: true });
-  const shot1 = path.join(debugDir, `challenge-debug-${Date.now()}.png`);
-  await page.screenshot({ path: shot1, fullPage: true });
-  console.log(`[reCAPTCHA] 🖼️ 画像認証画面スクショ: tmp/${path.basename(shot1)}`);
+  const debugShot1 = path.join(debugDir, `challenge-debug-${Date.now()}.png`);
+  await page.screenshot({ path: debugShot1, fullPage: true });
+  console.log(`[reCAPTCHA] 🖼️ 画像認証画面スクショ: tmp/${path.basename(debugShot1)}`);
 
-  // 5. 音声切替ボタン（ヘッドホンアイコン）を複数セレクタで試行
+  // 5. 少し待機して、iframe内部で直接再生ボタンをクリック
   await page.waitForTimeout(1500);
-  console.log('[reCAPTCHA] ▶ 音声切替ボタン（ヘッドホンアイコン）を試行');
-
-  const audioSelectors = [
-    'button.rc-button-audio',               // デフォルト実装
-    'button.rc-audiochallenge-play-button', // 新 UI
-    '#recaptcha-audio-button'               // 旧コード用
-  ];
-
-  let clicked = false;
-  for (const sel of audioSelectors) {
-    try {
-      await challengeFrame.waitForSelector(sel, { timeout: 5000 });
-      await challengeFrame.click(sel);
-      console.log(`[reCAPTCHA] ✅ '${sel}' をクリック成功`);
-      clicked = true;
-      break;
-    } catch {
-      console.log(`[reCAPTCHA] ⚠️ '${sel}' が見つからず／クリック失敗`);
-    }
-  }
-  if (!clicked) {
-    console.error('[reCAPTCHA] ❌ いずれの音声切替ボタンもクリックできず');
+  console.log('[reCAPTCHA] ▶ 音声切替ボタンを iframe 内で直接クリックを試行');
+  try {
+    await challengeFrame.waitForSelector('#recaptcha-audio-button', { timeout: 10000 });
+    await challengeFrame.click('#recaptcha-audio-button');
+    console.log('[reCAPTCHA] ✅ 音声切替ボタンクリック成功');
+  } catch {
+    console.error('[reCAPTCHA] ❌ 音声切替ボタンクリック失敗');
     return false;
   }
 
-  // 6. 音声チャレンジUIの確認（余裕を持って待機）
+  // 6. 余裕をもって待機し、音声チャレンジUIの確認
   console.log('[reCAPTCHA] 🔍 音声チャレンジUIを確認');
-  await page.waitForTimeout(2000);
+  await page.waitForTimeout(1500);
   try {
-    await challengeFrame.waitForSelector(
-      '#audio-response, .rc-audiochallenge-tdownload-link',
-      { timeout: 10000 }
-    );
+    await challengeFrame.waitForSelector('#audio-response', { timeout: 10000 });
     console.log('[reCAPTCHA] ✅ 音声チャレンジUI表示確認OK');
   } catch {
     console.error('[reCAPTCHA] ❌ 音声チャレンジUI表示確認NG');
-    // フォールト画面スクショ
-    const shotFail = path.join(debugDir, `audio-fail-${Date.now()}.png`);
-    await page.screenshot({ path: shotFail, fullPage: true });
-    console.log(`[reCAPTCHA] 📷 フォールト画面スクショ: tmp/${path.basename(shotFail)}`);
     return false;
   }
 
-  // ここまで確認用。以降は既存ロジック（音声ダウンロード→Whisper→入力→検証）を継続してください。
+  // スクショ：音声チャレンジ画面
+  const debugShot2 = path.join(debugDir, `audio-challenge-${Date.now()}.png`);
+  await page.screenshot({ path: debugShot2, fullPage: true });
+  console.log(`[reCAPTCHA] 🎥 音声チャレンジ画面スクショ: tmp/${path.basename(debugShot2)}`);
+
+  // 以下、まだ未到達なので省略…
   return false;
 }
 
