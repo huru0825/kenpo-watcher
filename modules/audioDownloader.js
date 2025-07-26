@@ -70,6 +70,13 @@ async function solveRecaptcha(page) {
   await page.screenshot({ path: debugShot1, fullPage: true });
   console.log(`[reCAPTCHA] 🖼️ 画像認証画面スクショ: tmp/${path.basename(debugShot1)}`);
 
+  const audioSelectors = [
+  'button.rc-button-audio',               // デフォルト
+  'button.rc-audiochallenge-play-button', // 新UI?
+  '#recaptcha-audio-button',              // 旧UI
+  'button[aria-label="Play audio challenge"]'
+  ];
+
   // 事前に存在チェック用の関数を定義
   async function logExistingSelectors(frame, selectors){
   for (const sel of selectors) {
@@ -88,12 +95,6 @@ console.log('[reCAPTCHA] ▶ クリック可能なセレクタを事前確認し
 await logExistingSelectors(challengeFrame, audioSelectors);
 
 console.log('[reCAPTCHA] ▶ 音声切替ボタンを iframe 内でクリックを試行');
-const audioSelectors = [
-  'button.rc-button-audio',               // デフォルト
-  'button.rc-audiochallenge-play-button', // 新UI?
-  '#recaptcha-audio-button',              // 旧UI
-  'button[aria-label="Play audio challenge"]'
-];
 
 let clicked = false;
 const results = [];  // 各セレクタの結果を貯めておく
