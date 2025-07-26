@@ -59,7 +59,7 @@ async function solveRecaptcha(page) {
   // --- ここからデバッグロジックを追加 ---
   // ボタンの outerHTML をログ出力
   const allButtonsHtml = await challengeFrame.evaluate(() =>
-    Array.from(document.querySelectorAll('[role="button"], .rc-audiochallenge-play-button, [tabindex="0"]'))
+    Array.from(document.querySelectorAll('button'))
       .map(b => b.outerHTML)
       .join('\n\n')
   );
@@ -73,23 +73,34 @@ async function solveRecaptcha(page) {
   console.log(`[reCAPTCHA][DEBUG] チャレンジUIスクショ: tmp/${path.basename(debugShot)}`);
   // --- デバッグロジックここまで ---
 
-  // 4. 動的セレクタ検出：全ボタンから「再生」を含むものを探す
-  console.log('[reCAPTCHA] ▶ 再生ボタン動的検出中');
-  const buttons = await challengeFrame.$$('button');
-  let playButton = null;
-  for (const btn of buttons) {
-    const label = await challengeFrame.evaluate(
-      el => el.innerText.trim() || el.getAttribute('aria-label') || el.getAttribute('title') || '',
-      btn
-    );
-    if (label.includes('再生')) {
-      playButton = btn;
-      console.log('[reCAPTCHA] 🔎 動的検出: 再生ボタン →', label);
-      break;
+  // 4. 新版セレクタで Play ボタンを探す
+  console.log('[reCAPTCHA] ▶ 新版セレクタで再生ボタンを探しています');
+  let playButton = await challengeFrame.$('#recaptcha-audio-button')
+    || await challengeFrame.$('button[aria-label="Play audio challenge"]');
+
+  if (playButton) {
+    console.log('[reCAPTCHA] 🔎 新版セレクタ検出: ', await challengeFrame.evaluate(el => el.outerHTML, playButton));
+  } else {
+    // 旧来の「再生」「play」をラベルに含む動的検出へフォールバック
+    console.log('[reCAPTCHA] ▶ 動的ラベル検出にフォールバック');
+    const buttons = await challengeFrame.$$('button');
+    for (const btn of buttons) {
+      const label = (await challengeFrame.evaluate(
+        el => el.innerText.trim().toLowerCase() ||
+              el.getAttribute('aria-label')?.toLowerCase() ||
+              el.getAttribute('title')?.toLowerCase() ||
+              '',
+        btn
+      ));
+      if (label.includes('再生') || label.includes('play')) {
+        playButton = btn;
+        console.log('[reCAPTCHA] 🔎 動的検出: 再生ボタン →', label);
+        break;
+      }
     }
   }
   if (!playButton) {
-    console.error('[reCAPTCHA] ❌ 再生ボタンが見つかりません（動的検出失敗）');
+    console.error('[reCAPTCHA] ❌ 再生ボタンが見つかりません');
     return false;
   }
 
