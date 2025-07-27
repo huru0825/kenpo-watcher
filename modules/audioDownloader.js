@@ -91,71 +91,66 @@ async function solveRecaptcha(page) {
   await page.screenshot({ path: debugShot1, fullPage: true });
   console.log(`[reCAPTCHA] 🖼️ 画像認証画面スクショ: tmp/${path.basename(debugShot1)}`);
 
-  const audioSelectors = [
-    'button.rc-button-audio',
-    'button.rc-audiochallenge-play-button',
-    '#recaptcha-audio-button',
-    'button[aria-label="Play audio challenge"]'
-  ];
-
-  // 存在チェック
-  async function logExistingSelectors(frame, selectors) {
-    for (const sel of selectors) {
-      const el = await frame.$(sel);
-      console.log(
-        el
-          ? `[reCAPTCHA] ✅ 存在: '${sel}'`
-          : `[reCAPTCHA] ⚠️ 存在しない: '${sel}'`
-      );
-    }
-  }
-
-  // 5. 音声切替ボタンを順次試行（初回待機15秒）
+  // --- 音声チャレンジ切り替えフェーズ ---
   await page.waitForTimeout(15000);
-  console.log('[reCAPTCHA] ▶ クリック可能なセレクタを事前確認します');
-  await logExistingSelectors(challengeFrame, audioSelectors);
-
-  console.log('[reCAPTCHA] ▶ 音声切替ボタンをクリック試行');
-  let clicked = false;
-  const results = [];
-  for (const sel of audioSelectors) {
-    console.log(`[reCAPTCHA] ▶ セレクタ '${sel}' を試行`);
+  const toggleSelectors = [
+    '#recaptcha-audio-button',      // 通常のヘッドホンアイコン
+    'button.rc-button-audio',       // 古いバージョン向け
+  ];
+  let toggled = false;
+  console.log('[reCAPTCHA] ▶ 音声チャレンジ切り替えボタンを試行');
+  for (const sel of toggleSelectors) {
     try {
-      await challengeFrame.waitForSelector(sel, { timeout: 5000 });
-      await challengeFrame.click(sel);
-      console.log(`[reCAPTCHA] ✅ '${sel}' クリック成功`);
-      results.push({ selector: sel, success: true });
-      clicked = true;
+      const btn = await challengeFrame.waitForSelector(sel, { visible: true, timeout: 5000 });
+      await btn.click();
+      console.log(`[reCAPTCHA] ✅ '${sel}' で音声チャレンジに切り替え`);
+      toggled = true;
       break;
-    } catch (err) {
-      console.log(`[reCAPTCHA] ⚠️ '${sel}' 試行失敗: ${err.message}`);
-      results.push({ selector: sel, success: false });
+    } catch {
+      console.log(`[reCAPTCHA] ⚠️ '${sel}' で切り替え失敗`);
     }
   }
-  if (!clicked) {
-    console.error('[reCAPTCHA] ❌ すべてのセレクタでクリック失敗');
-    console.table(results);
+  if (!toggled) {
+    console.error('[reCAPTCHA] ❌ 音声チャレンジ切り替えに失敗');
     return false;
   }
 
-  // 6. 音声チャレンジUIの確認
-  console.log('[reCAPTCHA] 🔍 音声チャレンジUIを確認');
-  await page.waitForTimeout(20000);
+  // --- 音声チャレンジ UI 出現待ち ---
   try {
-    await challengeFrame.waitForSelector(
-      '#audio-response, a.rc-audiochallenge-tdownload-link',
-      { timeout: 10000 }
-    );
-    console.log('[reCAPTCHA] ✅ 音声チャレンジUI表示確認OK');
+    await challengeFrame.waitForSelector('#audio-response', { timeout: 10000 });
+    console.log('[reCAPTCHA] ✅ 音声チャレンジUI検出');
   } catch {
-    console.error('[reCAPTCHA] ❌ 音声チャレンジUI表示確認NG');
-    const shotFail = path.join(debugDir, `audio-fail-${Date.now()}.png`);
-    await page.screenshot({ path: shotFail, fullPage: true });
-    console.log(`[reCAPTCHA] 📷 フォールト画面スクショ: tmp/${path.basename(shotFail)}`);
+    console.error('[reCAPTCHA] ❌ 音声チャレンジUI検出に失敗');
+    const failShot = path.join(debugDir, `audio-toggle-fail-${Date.now()}.png`);
+    await page.screenshot({ path: failShot, fullPage: true });
+    console.log(`[reCAPTCHA] 📷 フォールト画面スクショ: tmp/${path.basename(failShot)}`);
     return false;
   }
 
-  // 7. ダウンロード→Whisper→入力→検証…以降は変更なし
+  // --- 再生（Play）フェーズ ---
+  const playSelectors = [
+    'button.rc-audiochallenge-play-button',
+    'button[aria-label="Play audio challenge"]',
+  ];
+  let played = false;
+  console.log('[reCAPTCHA] ▶ 再生ボタンを試行');
+  for (const sel of playSelectors) {
+    try {
+      const playBtn = await challengeFrame.waitForSelector(sel, { visible: true, timeout: 5000 });
+      await playBtn.click();
+      console.log(`[reCAPTCHA] ✅ '${sel}' で再生ボタン押下`);
+      played = true;
+      break;
+    } catch {
+      console.log(`[reCAPTCHA] ⚠️ '${sel}' 再生ボタン未検出orクリック失敗`);
+    }
+  }
+  if (!played) {
+    console.error('[reCAPTCHA] ❌ 再生ボタン押下に失敗');
+    return false;
+  }
+
+  // --- ダウンロード→Whisper→入力→検証 ---
   let audioFilePath;
   try {
     audioFilePath = await downloadAudioFromPage(challengeFrame);
