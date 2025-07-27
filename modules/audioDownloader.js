@@ -160,7 +160,6 @@ async function solveRecaptcha(page) {
   // —— ここからDOMダンプ —— 
   const html = await challengeFrame.evaluate(() => document.documentElement.innerHTML);
   console.log('[reCAPTCHA][DEBUG] challengeFrame HTML:', html.slice(0, 2000));
-  // （必要ならファイル出力も可能）
   // fs.writeFileSync(path.join(debugDir, 'frame.html'), html, 'utf8');
 
   // 切り替え後の UI 要素チェック
