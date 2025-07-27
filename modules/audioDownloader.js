@@ -50,14 +50,29 @@ async function solveRecaptcha(page) {
     return false;
   }
 
-  // 4. challenge 用 iframe を page.frames().find で柔軟に取得
-  let challengeFrame = page.frames().find(
-    f =>
-      (f.url() && f.url().includes('/recaptcha/api2/bframe')) ||
-      f.name().startsWith('a-')
-  );
+  // 4. チャレンジ用 iframe の出現を待機＋取得 (最大60秒)
+  console.log('[reCAPTCHA] ▶ challenge 用 iframe の出現を待機 (20s)');
+  await page.waitForTimeout(20000);
+
+  console.log('[reCAPTCHA] ▶ challenge 用 iframe を最大60秒待つ');
+  let bframeHandle = await page
+    .waitForSelector('iframe[src*="/recaptcha/api2/bframe"]', { timeout: 60000 })
+    .catch(() => null);
+
+  let challengeFrame = bframeHandle
+    ? await bframeHandle.contentFrame()
+    : null;
+
+  // URL/name でも見つからなければ、ページ内の frames から探す
   if (!challengeFrame) {
-    // URL/name でも見つからなければ、title 属性を持つ iframe を探す
+    challengeFrame = page.frames().find(
+      f =>
+        (f.url() && f.url().includes('/recaptcha/api2/bframe')) ||
+        f.name().startsWith('a-')
+    );
+  }
+  // それでもなければ title 属性で探す
+  if (!challengeFrame) {
     const titleHandle = await page.$('iframe[title*="recaptcha challenge"]');
     if (titleHandle) {
       challengeFrame = await titleHandle.contentFrame();
@@ -95,7 +110,7 @@ async function solveRecaptcha(page) {
     }
   }
 
-  // 5. 音声切替ボタンを順次試行
+  // 5. 音声切替ボタンを順次試行（初回待機15秒）
   await page.waitForTimeout(15000);
   console.log('[reCAPTCHA] ▶ クリック可能なセレクタを事前確認します');
   await logExistingSelectors(challengeFrame, audioSelectors);
