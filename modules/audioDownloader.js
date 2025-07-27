@@ -105,6 +105,18 @@ async function solveRecaptcha(page) {
       await btn.click();
       console.log(`[reCAPTCHA] ✅ '${sel}' で音声チャレンジに切り替え`);
       toggled = true;
+
+      // — 対策2: 切り替え後に iframe 構造が変わっていれば再取得 —
+      await page.waitForTimeout(500);
+      const newFrameUrls = page.frames().map(f => f.url()).filter(u => u);
+      console.log('[reCAPTCHA][DEBUG] toggle後の frames:', newFrameUrls);
+
+      const newBframeHandle = await page.$('iframe[src*="/recaptcha/api2/bframe"]');
+      if (newBframeHandle) {
+        challengeFrame = await newBframeHandle.contentFrame();
+        console.log('[reCAPTCHA][DEBUG] 別 bframe を再取得');
+      }
+
       break;
     } catch {
       console.log(`[reCAPTCHA] ⚠️ '${sel}' で切り替え失敗`);
