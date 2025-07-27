@@ -55,7 +55,7 @@ async function solveRecaptcha(page) {
     f =>
       (f.url() && f.url().includes('/recaptcha/api2/bframe')) ||
       f.name().startsWith('a-') ||
-      f.title()?.toLowerCase().includes('recaptcha challenge')
+      (typeof f.title === 'function' && f.title().toLowerCase().includes('recaptcha challenge'))
   );
   if (!challengeFrame) {
     console.error('[reCAPTCHA] ❌ チャレンジ用iframe取得失敗');
@@ -178,3 +178,4 @@ module.exports = {
   downloadAudioFromPage,
   solveRecaptcha
 };
+```0
