@@ -26,9 +26,20 @@ async function downloadAudioFromPage(frame) {
 }
 
 async function solveRecaptcha(page) {
-  // 1. 全フレーム URL をログ出力（空文字列は除外）
-  const frameUrls = page.frames().map(f => f.url()).filter(u => u);
-  console.log('[reCAPTCHA] 🔍 frames:', frameUrls);
+  // --- ヘルパー: フレーム内のセレクタ存在チェック用ログ ---
+  async function logExistingSelectors(frame, selectors) {
+    for (const sel of selectors) {
+      const found = await frame.$(sel);
+      console.log(
+        found
+          ? `[reCAPTCHA][DEBUG] 存在: '${sel}'`
+          : `[reCAPTCHA][DEBUG] 未発見: '${sel}'`
+      );
+    }
+  }
+
+  // 1. 全フレーム URL をログ出力
+  console.log('[reCAPTCHA] 🔍 frames:', page.frames().map(f => f.url()).filter(u => u));
 
   // 2. チェックボックス iframe 抽出
   const anchorHandle = await page
@@ -50,33 +61,22 @@ async function solveRecaptcha(page) {
     return false;
   }
 
-  // 4. チャレンジ用 iframe の出現を待機＋取得 (最大60秒)
-  console.log('[reCAPTCHA] ▶ challenge 用 iframe の出現を待機 (20s)');
-  await page.waitForTimeout(20000);
-
+  // 4. challenge iframe の取得
   console.log('[reCAPTCHA] ▶ challenge 用 iframe を最大60秒待つ');
+  await page.waitForTimeout(20000);
   let bframeHandle = await page
     .waitForSelector('iframe[src*="/recaptcha/api2/bframe"]', { timeout: 60000 })
     .catch(() => null);
 
   let challengeFrame = bframeHandle
     ? await bframeHandle.contentFrame()
-    : null;
-
-  // URL/name でも見つからなければ、ページ内の frames から探す
-  if (!challengeFrame) {
-    challengeFrame = page.frames().find(
-      f =>
+    : page.frames().find(f =>
         (f.url() && f.url().includes('/recaptcha/api2/bframe')) ||
         f.name().startsWith('a-')
-    );
-  }
-  // それでもなければ title 属性で探す
+      );
   if (!challengeFrame) {
     const titleHandle = await page.$('iframe[title*="recaptcha challenge"]');
-    if (titleHandle) {
-      challengeFrame = await titleHandle.contentFrame();
-    }
+    if (titleHandle) challengeFrame = await titleHandle.contentFrame();
   }
   if (!challengeFrame) {
     console.error('[reCAPTCHA] ❌ チャレンジ用iframe取得失敗');
@@ -84,33 +84,34 @@ async function solveRecaptcha(page) {
   }
   console.log('[reCAPTCHA] ✅ challenge iframe 取得OK');
 
-  // --- デバッグ: 画像認証画面スクショ ---
+  // デバッグ: 画像認証スクショ
   const debugDir = path.resolve(__dirname, '../tmp');
   fs.mkdirSync(debugDir, { recursive: true });
   const debugShot1 = path.join(debugDir, `challenge-debug-${Date.now()}.png`);
   await page.screenshot({ path: debugShot1, fullPage: true });
   console.log(`[reCAPTCHA] 🖼️ 画像認証画面スクショ: tmp/${path.basename(debugShot1)}`);
 
-  // --- 音声チャレンジ切り替えフェーズ ---
+  // 5. 音声チャレンジ切り替えフェーズ
   await page.waitForTimeout(15000);
   const toggleSelectors = [
-    '#recaptcha-audio-button',      // 通常のヘッドホンアイコン
-    'button.rc-button-audio',       // 古いバージョン向け
+    '#recaptcha-audio-button',      // ヘッドホンアイコン
+    'button.rc-button-audio',       // 古いバージョン
   ];
   let toggled = false;
   console.log('[reCAPTCHA] ▶ 音声チャレンジ切り替えボタンを試行');
   for (const sel of toggleSelectors) {
     try {
-      const btn = await challengeFrame.waitForSelector(sel, { visible: true, timeout: 5000 });
-      await btn.click();
+      await challengeFrame.waitForSelector(sel, { visible: true, timeout: 5000 });
+      // DOM 内で直接 click() を発火
+      await challengeFrame.evaluate(s => {
+        document.querySelector(s).click();
+      }, sel);
       console.log(`[reCAPTCHA] ✅ '${sel}' で音声チャレンジに切り替え`);
       toggled = true;
 
-      // — 対策2: 切り替え後に iframe 構造が変わっていれば再取得 —
+      // — 対策2: フレーム構造変化をキャッチして再取得 —
       await page.waitForTimeout(500);
-      const newFrameUrls = page.frames().map(f => f.url()).filter(u => u);
-      console.log('[reCAPTCHA][DEBUG] toggle後の frames:', newFrameUrls);
-
+      console.log('[reCAPTCHA][DEBUG] toggle後の frames:', page.frames().map(f => f.url()).filter(u => u));
       const newBframeHandle = await page.$('iframe[src*="/recaptcha/api2/bframe"]');
       if (newBframeHandle) {
         challengeFrame = await newBframeHandle.contentFrame();
@@ -127,9 +128,19 @@ async function solveRecaptcha(page) {
     return false;
   }
 
-  // --- 音声チャレンジ UI 出現待ち ---
+  // 切り替え後の UI 要素チェック
+  console.log('[reCAPTCHA] 🔍 切り替え後の UI 要素チェック');
+  await logExistingSelectors(challengeFrame, [
+    '#audio-response',
+    'a.rc-audiochallenge-tdownload-link'
+  ]);
+
+  // 6. 音声チャレンジUIの検出（回答欄 or ダウンロードリンク）
   try {
-    await challengeFrame.waitForSelector('#audio-response', { timeout: 10000 });
+    await challengeFrame.waitForSelector(
+      '#audio-response, a.rc-audiochallenge-tdownload-link',
+      { timeout: 10000 }
+    );
     console.log('[reCAPTCHA] ✅ 音声チャレンジUI検出');
   } catch {
     console.error('[reCAPTCHA] ❌ 音声チャレンジUI検出に失敗');
@@ -139,7 +150,7 @@ async function solveRecaptcha(page) {
     return false;
   }
 
-  // --- 再生（Play）フェーズ ---
+  // 7. 再生（Play）フェーズ
   const playSelectors = [
     'button.rc-audiochallenge-play-button',
     'button[aria-label="Play audio challenge"]',
@@ -148,8 +159,11 @@ async function solveRecaptcha(page) {
   console.log('[reCAPTCHA] ▶ 再生ボタンを試行');
   for (const sel of playSelectors) {
     try {
-      const playBtn = await challengeFrame.waitForSelector(sel, { visible: true, timeout: 5000 });
-      await playBtn.click();
+      await challengeFrame.waitForSelector(sel, { visible: true, timeout: 5000 });
+      // 同様に evaluate でクリック
+      await challengeFrame.evaluate(s => {
+        document.querySelector(s).click();
+      }, sel);
       console.log(`[reCAPTCHA] ✅ '${sel}' で再生ボタン押下`);
       played = true;
       break;
@@ -162,7 +176,7 @@ async function solveRecaptcha(page) {
     return false;
   }
 
-  // --- ダウンロード→Whisper→入力→検証 ---
+  // 8. ダウンロード→Whisper→入力→検証
   let audioFilePath;
   try {
     audioFilePath = await downloadAudioFromPage(challengeFrame);
