@@ -51,12 +51,18 @@ async function solveRecaptcha(page) {
   }
 
   // 4. challenge 用 iframe を page.frames().find で柔軟に取得
-  const challengeFrame = page.frames().find(
+  let challengeFrame = page.frames().find(
     f =>
       (f.url() && f.url().includes('/recaptcha/api2/bframe')) ||
-      f.name().startsWith('a-') ||
-      (typeof f.title === 'function' && f.title().toLowerCase().includes('recaptcha challenge'))
+      f.name().startsWith('a-')
   );
+  if (!challengeFrame) {
+    // URL/name でも見つからなければ、title 属性を持つ iframe を探す
+    const titleHandle = await page.$('iframe[title*="recaptcha challenge"]');
+    if (titleHandle) {
+      challengeFrame = await titleHandle.contentFrame();
+    }
+  }
   if (!challengeFrame) {
     console.error('[reCAPTCHA] ❌ チャレンジ用iframe取得失敗');
     return false;
