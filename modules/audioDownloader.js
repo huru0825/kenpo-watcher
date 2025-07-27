@@ -106,7 +106,6 @@ async function solveRecaptcha(page) {
 
   let toggled = false;
   console.log('[reCAPTCHA] ▶ 音声チャレンジ切り替えボタンを試行');
-  // まずは通常セレクタ群で試す
   for (const sel of toggleSelectors) {
     try {
       await challengeFrame.waitForSelector(sel, { visible: true, timeout: 3000 });
@@ -157,6 +156,12 @@ async function solveRecaptcha(page) {
       console.log('[reCAPTCHA][DEBUG] 別 bframe を再取得');
     }
   }
+
+  // —— ここからDOMダンプ —— 
+  const html = await challengeFrame.evaluate(() => document.documentElement.innerHTML);
+  console.log('[reCAPTCHA][DEBUG] challengeFrame HTML:', html.slice(0, 2000));
+  // （必要ならファイル出力も可能）
+  // fs.writeFileSync(path.join(debugDir, 'frame.html'), html, 'utf8');
 
   // 切り替え後の UI 要素チェック
   console.log('[reCAPTCHA] 🔍 切り替え後の UI 要素チェック');
