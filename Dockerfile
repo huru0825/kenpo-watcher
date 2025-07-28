@@ -40,19 +40,22 @@ RUN apt-get update && apt-get install -y \
   libxtst6 \
   xdg-utils \
   xvfb \
-  xauth
+  xauth \
+  curl \
+  && rm -rf /var/lib/apt/lists/*
 
-# Puppeteer用Chromeを明示的にDL
+# Puppeteer用Chromeの自動DLはスキップ
 ENV PUPPETEER_SKIP_DOWNLOAD=true
-RUN npm i -g puppeteer
 
 # 作業ディレクトリ作成
 WORKDIR /app
 
-# ファイルコピー＆インストール
+# パッケージファイルコピー＆依存インストール
 COPY package*.json ./
 RUN npm install
+
+# アプリ全体をコピー
 COPY . .
 
-# XVFB経由でGUIブラウザを起動
+# XVFB 経由で npm start を実行（server.js 起動）
 CMD ["xvfb-run", "--server-args=-screen 0 1024x768x24", "npm", "start"]
