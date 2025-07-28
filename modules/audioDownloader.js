@@ -70,23 +70,29 @@ async function solveRecaptcha(page) {
   await challengeFrame.waitForSelector('.rc-imageselect-payload', { timeout: 15000 });
   console.log('[reCAPTCHA] ✅ 画像UI描画完了');
 
-  const audioTab = await challengeFrame.$('div.button-holder.audio-button-holder > button');
+  const isAlreadyAudio = await challengeFrame.$('.rc-audiochallenge');
+  if (!isAlreadyAudio) {
+    console.log('[reCAPTCHA] ▶ 音声チャレンジへの切り替え準備');
+    const audioTab = await challengeFrame.$('div.button-holder.audio-button-holder > button');
 
-  if (!audioTab) {
-    console.warn('[reCAPTCHA] ⚠️ 音声切り替えボタンが見つかりませんでした');
-    await challengeFrame.screenshot({ path: `tmp/no-audio-tab-${Date.now()}.png` });
-    return false;
+    if (!audioTab) {
+      console.warn('[reCAPTCHA] ⚠️ 音声切り替えボタンが見つかりませんでした');
+      await challengeFrame.screenshot({ path: `tmp/no-audio-tab-${Date.now()}.png` });
+      return false;
+    }
+
+    const tabBox = await audioTab.boundingBox();
+    await page.mouse.move(
+      tabBox.x + tabBox.width * Math.random(),
+      tabBox.y + tabBox.height * Math.random(),
+      { steps: 5 }
+    );
+    await page.waitForTimeout(randomDelay(500, 1200));
+    await audioTab.click();
+    console.log('[reCAPTCHA] ✅ 音声チャレンジに切り替え');
+  } else {
+    console.log('[reCAPTCHA] 🎧 既に音声チャレンジモードです');
   }
-
-  const tabBox = await audioTab.boundingBox();
-  await page.mouse.move(
-    tabBox.x + tabBox.width * Math.random(),
-    tabBox.y + tabBox.height * Math.random(),
-    { steps: 5 }
-  );
-  await page.waitForTimeout(randomDelay(500, 1200));
-  await audioTab.click();
-  console.log('[reCAPTCHA] ✅ 音声チャレンジに切り替え');
 
   await challengeFrame.evaluate(() => {
     const btn = document.getElementById('recaptcha-audio-button');
@@ -94,17 +100,11 @@ async function solveRecaptcha(page) {
     console.log('[DEBUG] audio-button attributes:', btn ? Array.from(btn.attributes).map(a => `${a.name}="${a.value}"`) : []);
   });
 
-  const audioButton = await challengeFrame.$('#recaptcha-audio-button');
-  if (!audioButton) {
-    console.warn('[reCAPTCHA] ⚠️ audio-button が存在しません');
-    await challengeFrame.screenshot({ path: `tmp/no-audio-button-${Date.now()}.png` });
-    return false;
-  }
-
   try {
     await challengeFrame.waitForFunction(() => {
-      const b = document.getElementById('recaptcha-audio-button');
-      return b && !b.disabled;
+      const audioUI = document.querySelector('.rc-audiochallenge');
+      const btn = document.getElementById('recaptcha-audio-button');
+      return audioUI && btn && !btn.disabled;
     }, { timeout: 10000 });
     console.log('[reCAPTCHA] ✅ audio ボタン有効化検出OK');
   } catch (err) {
