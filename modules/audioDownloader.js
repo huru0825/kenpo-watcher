@@ -160,13 +160,14 @@ async function solveRecaptcha(page) {
   }
 
   // ──────────【追加】ここから──────────
-  // 8. audio 要素出現待機＆ログ
-  console.log('[reCAPTCHA] ▶ audio 要素出現待機');
+  // 8. 再生ボタン出現待機＆取得
+  console.log('[reCAPTCHA] ▶ 再生ボタン取得');
+  let playBtn;
   try {
-    await waitForSelectorWithRetry(challengeFrame, 'audio', { interval: 500, maxRetries: 20 });
-    console.log('[reCAPTCHA] ✅ audio 要素検出OK');
+    playBtn = await waitForSelectorWithRetry(challengeFrame, 'button.rc-audiochallenge-play-button', { interval: 500, maxRetries: 20 });
+    console.log('[reCAPTCHA] ✅ 再生ボタン検出OK');
   } catch (err) {
-    console.error('[reCAPTCHA] ❌ audio 要素が出現しませんでした:', err);
+    console.error('[reCAPTCHA] ❌ 再生ボタンが出現しませんでした:', err);
     return false;
   }
   // ──────────追加ここまで──────────
@@ -183,13 +184,25 @@ async function solveRecaptcha(page) {
     return false;
   }
 
-  // 10. 再生（Play）→ダウンロード→Whisper→入力→検証
-  console.log('[reCAPTCHA] ▶ 再生（audio.play()）を実行');
-  await challengeFrame.evaluate(() => {
-    const aud = document.querySelector('audio');
-    if (aud) aud.play();
-  });
+  // ──────────【提案マージ】ここから──────────
+  // 10. 再生→ボタン状態変化を待機→テキスト欄を待機
+  console.log('[reCAPTCHA] ▶ 再生ボタン押下＆状態変化待機');
+  await playBtn.click();
+  // ボタンに "再生中" クラスやテキスト変化が現れるまで待つ
+  await challengeFrame.waitForFunction(() => {
+    const btn = document.querySelector('button.rc-audiochallenge-play-button');
+    return btn && (
+      btn.classList.contains('rc-audiochallenge-playing') ||
+      /再生中/.test(btn.innerText)
+    );
+  }, { timeout: 10000 });
+  console.log('[reCAPTCHA] ✅ 再生中状態検出OK');
+  // 状態変化後にテキスト欄を待機
+  await waitForSelectorWithRetry(challengeFrame, '#audio-response', { interval: 500, maxRetries: 20 });
+  console.log('[reCAPTCHA] ✅ テキスト欄出現検出OK');
+  // ──────────追加ここまで──────────
 
+  // 11. ダウンロード→Whisper→入力→検証
   let audioFilePath;
   try {
     audioFilePath = await downloadAudioFromPage(challengeFrame);
@@ -211,7 +224,7 @@ async function solveRecaptcha(page) {
   await inputEl.type(text.trim(), { delay: 100 });
   console.log('[reCAPTCHA] ✅ テキスト入力完了');
 
-  // 11. 確認ボタン押下
+  // 12. 確認ボタン押下
   await verifyEl.click();
   console.log('[reCAPTCHA] ✅ 確認ボタン押下');
 
