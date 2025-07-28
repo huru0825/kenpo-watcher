@@ -3,8 +3,12 @@ set -euxo pipefail
 
 echo "[install-chrome.sh] start"
 
-# ここで xauth を入れる（ビルド時なら通る）
-apt-get update && apt-get install -y xauth
+# Renderのビルドフェーズでのみ成功する
+if [ -w /var/lib/apt/lists ]; then
+  apt-get update && apt-get install -y xauth
+else
+  echo "[install-chrome.sh] Skipping apt-get: likely running in deploy phase"
+fi
 
 CACHE_DIR="$(pwd)/.cache/puppeteer"
 TARGET_DEB="google-chrome-stable_current_amd64.deb"
