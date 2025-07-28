@@ -59,5 +59,8 @@ RUN npm install
 # アプリ全体をコピー
 COPY . .
 
-# XVFB 経由で npm start を実行（server.js 起動）
-CMD ["xvfb-run", "--server-args=-screen 0 1024x768x24", "npm", "start"]
+# 実行権限を付与
+RUN chmod +x ./start.sh
+
+# start.sh 経由で xvfb 起動 & npm start 実行
+CMD ["./start.sh"]
