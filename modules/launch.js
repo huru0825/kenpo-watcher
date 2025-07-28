@@ -5,7 +5,7 @@ const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 puppeteer.use(StealthPlugin());
 
 let launchOptions = {
-  headless: 'new',
+  headless: false,
   args: [
     '--no-sandbox',
     '--disable-setuid-sandbox',
