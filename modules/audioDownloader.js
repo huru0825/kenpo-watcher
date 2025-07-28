@@ -88,16 +88,18 @@ async function solveRecaptcha(page) {
   await challengeFrame.click('div.button-holder.audio-button-holder > button');
   console.log('[reCAPTCHA] ✅ 音声チャレンジに切り替え');
 
-  // ← ここでデバッグ：切り替え直後の DOM とフレーム一覧をダンプ
-  console.log('[DEBUG] ▶ 切り替え直後の DOM:');
-  console.log(await challengeFrame.evaluate(() => document.documentElement.outerHTML));
-  console.log('[DEBUG] ▶ 現在のフレーム一覧:');
-  console.log(page.frames().map(f => f.url()));
+  // 4-a. audio ボタンが有効化されるまで待機
+  console.log('[reCAPTCHA] ▶ audio ボタン有効化待機');
+  await challengeFrame.waitForSelector('#recaptcha-audio-button:not([disabled])', { timeout:10000 });
+  console.log('[reCAPTCHA] ✅ audio ボタン有効化検出OK');
 
   // 5. 新bframe取得
   {
     const newB = await waitForSelectorWithRetry(page, 'iframe[src*="/recaptcha/api2/bframe"]', { interval:500, maxRetries:20 }).catch(()=>null);
-    if (newB) { challengeFrame = await newB.contentFrame(); console.log('[reCAPTCHA] 🔄 新bframe取得'); }
+    if (newB) { 
+      challengeFrame = await newB.contentFrame(); 
+      console.log('[reCAPTCHA] 🔄 新bframe取得'); 
+    }
   }
 
   // ────────── 切り分け開始 ──────────
@@ -169,3 +171,4 @@ async function solveRecaptcha(page) {
 }
 
 module.exports = { downloadAudioFromPage, solveRecaptcha };
+```0
