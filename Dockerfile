@@ -39,7 +39,8 @@ RUN apt-get update && apt-get install -y \
   libxss1 \
   libxtst6 \
   xdg-utils \
-  xvfb
+  xvfb \
+  xauth
 
 # Puppeteer用Chromeを明示的にDL
 ENV PUPPETEER_SKIP_DOWNLOAD=true
