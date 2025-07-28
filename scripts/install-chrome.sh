@@ -1,4 +1,4 @@
-# install-chrome.sh（修正後）※ xauth系の処理は削除
+# scripts/install-chrome.sh
 #!/usr/bin/env bash
 set -euxo pipefail
 
