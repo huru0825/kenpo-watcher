@@ -3,7 +3,6 @@ const fs = require('fs');
 const path = require('path');
 const { run, warmup, setSharedContext } = require('./index');
 const {
-  CHROME_PATH,
   GAS_WEBHOOK_URL,
   INDEX_URL,
   BASE_URL
@@ -31,7 +30,7 @@ app.use('/tmp', express.static(path.join(__dirname, 'tmp')));
   setSharedContext({
     puppeteer,
     launchOptions: {
-      executablePath: CHROME_PATH,
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
       headless: 'new',
       args: [
         '--no-sandbox',
