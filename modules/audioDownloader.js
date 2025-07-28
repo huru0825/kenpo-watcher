@@ -87,10 +87,29 @@ async function solveRecaptcha(page) {
   await challengeFrame.click('div.button-holder.audio-button-holder > button');
   console.log('[reCAPTCHA] ✅ 音声チャレンジに切り替え');
 
+  // ——— 追加デバッグ① ———
+  // 切り替え直後の audio-button の属性チェック
+  await challengeFrame.evaluate(() => {
+    const btn = document.getElementById('recaptcha-audio-button');
+    console.log('[DEBUG] audio-button disabled:', btn ? btn.disabled : '未発見');
+    console.log('[DEBUG] audio-button attributes:', btn ? Array.from(btn.attributes).map(a => `${a.name}="${a.value}"`) : []);
+  });
+
   // 🔘 追加ポイント①: audioボタン有効化待機
   console.log('[reCAPTCHA] ▶ audio ボタン有効化待機');
-  await challengeFrame.waitForSelector('#recaptcha-audio-button:not([disabled])', { timeout:10000 });
-  console.log('[reCAPTCHA] ✅ audio ボタン有効化検出OK');
+  try {
+    // disabled 属性が外れるまで待機
+    await challengeFrame.waitForFunction(() => {
+      const b = document.getElementById('recaptcha-audio-button');
+      return b && !b.disabled;
+    }, { timeout:10000 });
+    console.log('[reCAPTCHA] ✅ audio ボタン有効化検出OK');
+  } catch (err) {
+    console.error('[DEBUG] 🔴 audio-button が有効化されませんでした:', err);
+    console.log('[DEBUG] ▶ 切り替え後 DOM snapshot:');
+    console.log(await challengeFrame.evaluate(() => document.documentElement.outerHTML));
+    return false;
+  }
 
   // 🔄 新bframe取得
   {
