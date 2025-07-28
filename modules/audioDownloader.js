@@ -88,7 +88,7 @@ async function solveRecaptcha(page) {
   await challengeFrame.click('div.button-holder.audio-button-holder > button');
   console.log('[reCAPTCHA] ✅ 音声チャレンジに切り替え');
 
-  // デバッグ：切り替え直後のDOM＆フレーム一覧ダンプ
+  // ← ここでデバッグ：切り替え直後の DOM とフレーム一覧をダンプ
   console.log('[DEBUG] ▶ 切り替え直後の DOM:');
   console.log(await challengeFrame.evaluate(() => document.documentElement.outerHTML));
   console.log('[DEBUG] ▶ 現在のフレーム一覧:');
