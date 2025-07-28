@@ -77,34 +77,22 @@ async function solveRecaptcha(page) {
     await page.screenshot({ path: shot, fullPage:true });
     console.log(`[reCAPTCHA] 🖼️ challenge iframeスクショ: tmp/${path.basename(shot)}`);
   }
-  await Promise.race([
-    challengeFrame.waitForSelector('.rc-imageselect-payload, .rc-imageselect-tileloop-begin', { timeout:15000 }),
-    challengeFrame.waitForSelector('button.rc-audiochallenge-play-button', { timeout:15000 }),
-  ]).catch(()=>console.warn('[reCAPTCHA] ⚠️ UIロード待機タイムアウト'));
+  // 画像UIを先に完全に待つ
+  console.log('[reCAPTCHA] ▶ 画像UIの描画待機');
+  await challengeFrame.waitForSelector('.rc-imageselect-payload', { timeout:15000 });
+  console.log('[reCAPTCHA] ✅ 画像UI描画完了');
 
   // 4. 音声切り替えクリック
-  await challengeFrame.evaluate(()=>{
-    const ov = document.querySelector('div[style*="opacity: 0.05"]');
-    if (ov) ov.style.pointerEvents='none';
-  });
-  console.log('[reCAPTCHA] ▶ 音声切り替え試行');
-  let toggled = false;
-  for (const sel of [
-    'div.button-holder.audio-button-holder>button',
-    'button[title="確認用の文字を音声として聞く"]',
-    '#recaptcha-audio-button',
-    'button.rc-button-audio',
-    'button[aria-label*="audio"]'
-  ]) {
-    try {
-      const btn = await waitForSelectorWithRetry(challengeFrame, sel, { interval:500, maxRetries:20 });
-      await btn.click();
-      toggled = true;
-      console.log(`[reCAPTCHA] ✅ '${sel}' クリック`);
-      break;
-    } catch {}
-  }
-  if (!toggled) { console.error('[reCAPTCHA] ❌ 音声切替失敗'); return false; }
+  await challengeFrame.waitForSelector('div.button-holder.audio-button-holder > button', { timeout:15000 });
+  console.log('[reCAPTCHA] ▶ 音声切り替えボタン検出OK');
+  await challengeFrame.click('div.button-holder.audio-button-holder > button');
+  console.log('[reCAPTCHA] ✅ 音声チャレンジに切り替え');
+
+  // デバッグ：切り替え直後のDOM＆フレーム一覧ダンプ
+  console.log('[DEBUG] ▶ 切り替え直後の DOM:');
+  console.log(await challengeFrame.evaluate(() => document.documentElement.outerHTML));
+  console.log('[DEBUG] ▶ 現在のフレーム一覧:');
+  console.log(page.frames().map(f => f.url()));
 
   // 5. 新bframe取得
   {
