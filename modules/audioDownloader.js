@@ -25,6 +25,15 @@ async function downloadAudioFromPage(frame) {
   return filePath;
 }
 
+async function waitForSelectorWithRetry(frame, selector, { interval = 1000, maxRetries = 10 } = {}) {
+  for (let i = 0; i < maxRetries; i++) {
+    const el = await frame.$(selector);
+    if (el) return el;
+    await frame.waitForTimeout(interval);
+  }
+  throw new Error(`Selector "${selector}" が ${interval * maxRetries}ms 内に見つかりませんでした`);
+}
+
 async function solveRecaptcha(page) {
   // --- ヘルパー: フレーム内のセレクタ存在チェック用ログ ---
   async function logExistingSelectors(frame, selectors) {
@@ -178,14 +187,17 @@ async function solveRecaptcha(page) {
     console.warn('[reCAPTCHA] ⚠️ 音声UI検出失敗 → 再生へ直接進む');
   }
 
-  // ――――― ここから追加 ―――――
-  // 8a. Downloadリンク／入力欄／確認ボタン の存在チェック
-  await Promise.all([
-    challengeFrame.waitForSelector('#audio-response',                   { timeout: 5000 }),
-    challengeFrame.waitForSelector('a.rc-audiochallenge-tdownload-link', { timeout: 5000 }),
-    challengeFrame.waitForSelector('button#recaptcha-verify-button',    { timeout: 5000 }),
-  ]);
-  console.log('[reCAPTCHA] ✅ Download/UI/確認ボタン 全部OK');
+  // ――――― ここから追加: 要素取得をリトライで確実に掴む ―――――
+  let inputEl, downloadEl, verifyEl;
+  try {
+    inputEl    = await waitForSelectorWithRetry(challengeFrame, '#audio-response',                   { interval: 1000, maxRetries: 10 });
+    downloadEl = await waitForSelectorWithRetry(challengeFrame, 'a.rc-audiochallenge-tdownload-link', { interval: 1000, maxRetries: 10 });
+    verifyEl   = await waitForSelectorWithRetry(challengeFrame, 'button#recaptcha-verify-button',    { interval: 1000, maxRetries: 10 });
+    console.log('[reCAPTCHA] ✅ 必要要素を全て確保');
+  } catch (err) {
+    console.error('[reCAPTCHA] ❌ 要素取得タイムアウト:', err);
+    return false;
+  }
   // ――――― 追加ここまで ―――――
 
   // 8. 再生（Play）フェーズ
@@ -232,18 +244,12 @@ async function solveRecaptcha(page) {
   }
 
   console.log('[reCAPTCHA] ▶ テキスト入力を試行');
-  await challengeFrame.type('#audio-response', text.trim(), { delay: 100 });
-  const inputValue = await challengeFrame.$eval('#audio-response', el => el.value);
-  if (!inputValue) {
-    console.error('[reCAPTCHA] ❌ テキスト入力失敗');
-    return false;
-  }
+  await inputEl.type(text.trim(), { delay: 100 });
   console.log('[reCAPTCHA] ✅ テキスト入力成功');
 
-  // 10. 確認ボタンを待機＆クリック
-  console.log('[reCAPTCHA] ▶ 確認ボタン待機＆クリック');
-  await challengeFrame.waitForSelector('button#recaptcha-verify-button', { visible: true });
-  await challengeFrame.click('button#recaptcha-verify-button');
+  // 10. 確認ボタンをクリック
+  console.log('[reCAPTCHA] ▶ 確認ボタン押下');
+  await verifyEl.click();
   console.log('[reCAPTCHA] ✅ 確認ボタン押下');
 
   await page.waitForTimeout(2000);
