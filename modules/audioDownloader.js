@@ -173,13 +173,27 @@ async function solveRecaptcha(page) {
   }
 
   // 8. 再生（Play）フェーズ
-  try {
-    console.log('[reCAPTCHA] ▶ 再生ボタン待機 (.rc-audiochallenge-play-button)');
-    const playBtn = await challengeFrame.waitForSelector('button.rc-audiochallenge-play-button', { timeout: 15000 });
-    console.log('[reCAPTCHA] ✅ 再生ボタン検出OK → クリック');
-    await playBtn.click();
-  } catch {
-    console.error('[reCAPTCHA] ❌ 再生ボタン検出／クリック失敗');
+  const playSelectors = [
+    'button.rc-button-default.goog-inline-block',      // クラス指定
+    'button[aria-labelledby="audio-instructions"]',    // aria-labelledby 指定
+    'button.rc-audiochallenge-play-button',            // 既存セレクタ
+    // …他のフォールバックがあれば追加
+  ];
+  let played = false;
+  console.log('[reCAPTCHA] ▶ 再生ボタンを試行');
+  for (const sel of playSelectors) {
+    try {
+      const btn = await challengeFrame.waitForSelector(sel, { visible: true, timeout: 5000 });
+      await btn.click();
+      console.log(`[reCAPTCHA] ✅ '${sel}' で再生ボタン押下`);
+      played = true;
+      break;
+    } catch {
+      console.log(`[reCAPTCHA] ⚠️ '${sel}' 未検出 or クリック失敗`);
+    }
+  }
+  if (!played) {
+    console.error('[reCAPTCHA] ❌ 再生ボタン押下に完全失敗');
     return false;
   }
 
