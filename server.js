@@ -82,7 +82,7 @@ app.post('/run', handleRun);
 // ポートバインド＋Warmup
 const port = process.env.PORT || 10000;
 app.listen(port, async () => {
-console.log(Server listening on port ${port});
+console.log(`Server listening on port ${port}`);
 try {
 console.log('✨ Warmup: launching browser to avoid cold start...');
 if (typeof warmup === 'function') {
