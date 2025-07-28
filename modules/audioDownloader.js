@@ -91,15 +91,24 @@ async function solveRecaptcha(page) {
   await page.screenshot({ path: debugShot1, fullPage: true });
   console.log(`[reCAPTCHA] 🖼️ 画像認証画面スクショ: tmp/${path.basename(debugShot1)}`);
 
-  // 5. 画像認証UIが完全にロードされるのを待機
+  // 5. 画像認証UIまたはAudioUIがロードされるのを待機
   try {
-    console.log('[reCAPTCHA] ▶ 画像認証UIを待機 (.rc-imageselect)');
-    await challengeFrame.waitForSelector('.rc-imageselect', { timeout: 15000 });
-    console.log('[reCAPTCHA] ✅ 画像認証UI検出OK');
+    console.log('[reCAPTCHA] ▶ UIロード待機 (.rc-imageselect-payload | .rc-imageselect-tileloop-begin OR audio-play-button)');
+    await Promise.race([
+      challengeFrame.waitForSelector(
+        '.rc-imageselect-payload, .rc-imageselect-tileloop-begin',
+        { timeout: 15000 }
+      ),
+      challengeFrame.waitForSelector('button.rc-audiochallenge-play-button', { timeout: 15000 })
+    ]);
+    console.log('[reCAPTCHA] ✅ UIロード検出OK');
   } catch {
-    console.error('[reCAPTCHA] ❌ 画像認証UI検出失敗');
-    return false;
+    console.warn('[reCAPTCHA] ⚠️ UIロード待機タイムアウト → 続行');
   }
+
+  // （オプション）DOMダンプで実態を確認
+  const html = await challengeFrame.evaluate(() => document.documentElement.innerHTML);
+  console.log('[reCAPTCHA][DEBUG] challengeFrame innerHTML:', html.slice(0, 1000));
 
   // 6. 音声チャレンジ切り替えフェーズ
   await page.waitForTimeout(15000);
@@ -163,7 +172,7 @@ async function solveRecaptcha(page) {
 
   // 8. 再生（Play）フェーズ
   try {
-    console.log('[reCAPTCHA] ▶ 再生ボタンを待機 (.rc-audiochallenge-play-button)');
+    console.log('[reCAPTCHA] ▶ 再生ボタン待機 (.rc-audiochallenge-play-button)');
     await challengeFrame.waitForSelector('button.rc-audiochallenge-play-button', { timeout: 15000 });
     console.log('[reCAPTCHA] ✅ 再生ボタン検出OK → クリック');
     await challengeFrame.click('button.rc-audiochallenge-play-button');
@@ -201,7 +210,7 @@ async function solveRecaptcha(page) {
   console.log('[reCAPTCHA] ✅ テキスト入力成功');
 
   // 10. 確認ボタンを待機＆クリック
-  console.log('[reCAPTCHA] ▶ 確認ボタンを待機＆クリック');
+  console.log('[reCAPTCHA] ▶ 確認ボタン待機＆クリック');
   await challengeFrame.waitForSelector('button#recaptcha-verify-button', { visible: true });
   await challengeFrame.click('button#recaptcha-verify-button');
   console.log('[reCAPTCHA] ✅ 確認ボタン押下');
