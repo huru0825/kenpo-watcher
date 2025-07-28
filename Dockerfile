@@ -46,6 +46,8 @@ RUN apt-get update && apt-get install -y \
 
 # Puppeteer用Chromeの自動DLはスキップ
 ENV PUPPETEER_SKIP_DOWNLOAD=true
+ENV DISPLAY=:99
+USER node
 
 # 作業ディレクトリ作成
 WORKDIR /app
