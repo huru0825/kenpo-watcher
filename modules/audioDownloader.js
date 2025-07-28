@@ -32,7 +32,7 @@ async function downloadAudioFromPage(frame) {
  * selector を定期ポーリングでリトライ取得するユーティリティ。
  * 見つかれば ElementHandle を返し、最大時間超過でエラーを投げる。
  */
-async function waitForSelectorWithRetry(frame, selector, { interval = 1000, maxRetries = 10 } = {}) {
+async function waitForSelectorWithRetry(frame, selector, { interval = 1000, maxRetries = 60 } = {}) {
   for (let i = 0; i < maxRetries; i++) {
     const el = await frame.$(selector);
     if (el) return el;
@@ -136,7 +136,7 @@ async function solveRecaptcha(page) {
     'button[title*="音声"]',
   ]) {
     try {
-      const btn = await waitForSelectorWithRetry(challengeFrame, sel, { interval: 500, maxRetries: 10 });
+      const btn = await waitForSelectorWithRetry(challengeFrame, sel, { interval: 500, maxRetries: 20 });
       await btn.click();
       console.log(`[reCAPTCHA] ✅ '${sel}' で音声チャレンジに切り替え`);
       toggled = true;
@@ -152,7 +152,7 @@ async function solveRecaptcha(page) {
 
   // bframe 再取得
   {
-    const newB = await waitForSelectorWithRetry(page, 'iframe[src*="/recaptcha/api2/bframe"]', { interval: 500, maxRetries: 10 })
+    const newB = await waitForSelectorWithRetry(page, 'iframe[src*="/recaptcha/api2/bframe"]', { interval: 500, maxRetries: 20 })
       .catch(() => null);
     if (newB) {
       challengeFrame = await newB.contentFrame();
@@ -163,9 +163,9 @@ async function solveRecaptcha(page) {
   // 7. 必要要素を確実に掴む
   let inputEl, downloadEl, verifyEl;
   try {
-    inputEl    = await waitForSelectorWithRetry(challengeFrame, '#audio-response',                   { interval: 500, maxRetries: 20 });
-    downloadEl = await waitForSelectorWithRetry(challengeFrame, 'a.rc-audiochallenge-tdownload-link', { interval: 500, maxRetries: 20 });
-    verifyEl   = await waitForSelectorWithRetry(challengeFrame, 'button#recaptcha-verify-button',    { interval: 500, maxRetries: 20 });
+    inputEl    = await waitForSelectorWithRetry(challengeFrame, '#audio-response',                   { interval: 500, maxRetries: 60 });
+    downloadEl = await waitForSelectorWithRetry(challengeFrame, 'a.rc-audiochallenge-tdownload-link', { interval: 500, maxRetries: 60 });
+    verifyEl   = await waitForSelectorWithRetry(challengeFrame, 'button#recaptcha-verify-button',    { interval: 500, maxRetries: 60 });
     console.log('[reCAPTCHA] ✅ 入力／DL／確認ボタン 全部確保');
   } catch (err) {
     console.error('[reCAPTCHA] ❌ 要素取得タイムアウト:', err);
@@ -181,7 +181,7 @@ async function solveRecaptcha(page) {
     'button.rc-audiochallenge-play-button',
   ]) {
     try {
-      const btn = await waitForSelectorWithRetry(challengeFrame, sel, { interval: 500, maxRetries: 10 });
+      const btn = await waitForSelectorWithRetry(challengeFrame, sel, { interval: 500, maxRetries: 20 });
       await btn.click();
       console.log(`[reCAPTCHA] ✅ '${sel}' で再生押下`);
       played = true;
