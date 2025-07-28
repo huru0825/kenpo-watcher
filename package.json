@@ -4,7 +4,7 @@
   "scripts": {
     "bundle": "esbuild index.js --bundle --platform=node --outdir=dist --external:filePath --external:t2.extends --external:path2",
     "build-binary": "pkg dist/index.js --targets node16-linux-x64 --output kenpo-watcher",
-    "start": "bash -c 'apt-get update && apt-get install -y xauth && xvfb-run --server-args=\"-screen 0 1024x768x24\" node server.js'"
+    "start": "xvfb-run --server-args='-screen 0 1024x768x24' node server.js"
   },
   "dependencies": {
     "axios": "^1.10.0",
