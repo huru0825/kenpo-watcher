@@ -101,7 +101,10 @@ async function solveRecaptcha(page) {
       '[reCAPTCHA] ▶ UIロード待機 (.rc-imageselect-payload | .rc-imageselect-tileloop-begin OR play-button)'
     );
     await Promise.race([
-      challengeFrame.waitForSelector('.rc-imageselect-payload, .rc-imageselect-tileloop-begin', { timeout: 15000 }),
+      challengeFrame.waitForSelector(
+        '.rc-imageselect-payload, .rc-imageselect-tileloop-begin',
+        { timeout: 15000 }
+      ),
       challengeFrame.waitForSelector('button.rc-audiochallenge-play-button', { timeout: 15000 })
     ]);
     console.log('[reCAPTCHA] ✅ UIロード検出OK');
@@ -166,18 +169,30 @@ async function solveRecaptcha(page) {
     'a.rc-audiochallenge-tdownload-link'
   ]);
   try {
-    await challengeFrame.waitForSelector('#audio-response, a.rc-audiochallenge-tdownload-link', { timeout: 5000 });
+    await challengeFrame.waitForSelector(
+      '#audio-response, a.rc-audiochallenge-tdownload-link',
+      { timeout: 5000 }
+    );
     console.log('[reCAPTCHA] ✅ 音声チャレンジUI検出');
   } catch {
     console.warn('[reCAPTCHA] ⚠️ 音声UI検出失敗 → 再生へ直接進む');
   }
 
+  // ――――― ここから追加 ―――――
+  // 8a. Downloadリンク／入力欄／確認ボタン の存在チェック
+  await Promise.all([
+    challengeFrame.waitForSelector('#audio-response',                   { timeout: 5000 }),
+    challengeFrame.waitForSelector('a.rc-audiochallenge-tdownload-link', { timeout: 5000 }),
+    challengeFrame.waitForSelector('button#recaptcha-verify-button',    { timeout: 5000 }),
+  ]);
+  console.log('[reCAPTCHA] ✅ Download/UI/確認ボタン 全部OK');
+  // ――――― 追加ここまで ―――――
+
   // 8. 再生（Play）フェーズ
   const playSelectors = [
-    'button.rc-button-default.goog-inline-block',      // クラス指定
-    'button[aria-labelledby="audio-instructions"]',    // aria-labelledby 指定
-    'button.rc-audiochallenge-play-button',            // 既存セレクタ
-    // …他のフォールバックがあれば追加
+    'button.rc-button-default.goog-inline-block',
+    'button[aria-labelledby="audio-instructions"]',
+    'button.rc-audiochallenge-play-button',
   ];
   let played = false;
   console.log('[reCAPTCHA] ▶ 再生ボタンを試行');
