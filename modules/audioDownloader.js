@@ -1,4 +1,4 @@
-// audioDownloader.js
+// modules/audioDownloader.js
 const fs = require('fs');
 const path = require('path');
 const { transcribeAudio } = require('./whisper');
@@ -36,18 +36,14 @@ async function waitForSelectorWithRetry(frame, selector, { interval = 1000, maxR
   throw new Error(`Selector "${selector}" が ${interval * maxRetries}ms 内に見つかりませんでした`);
 }
 
-async function solveRecaptcha(page) {
-  // デバッグ用ログ
-  async function logExistingSelectors(frame, selectors) {
-    for (const sel of selectors) {
-      console.log(
-        (await frame.$(sel))
-          ? `[reCAPTCHA][DEBUG] 存在: '${sel}'`
-          : `[reCAPTCHA][DEBUG] 未発見: '${sel}'`
-      );
-    }
-  }
+// ──────────────
+// 人間っぽい動作のためのユーティリティ
+function randomDelay(min = 200, max = 800) {
+  return Math.floor(Math.random() * (max - min)) + min;
+}
+// ──────────────
 
+async function solveRecaptcha(page) {
   console.log('[reCAPTCHA] 🔍 frames:', page.frames().map(f => f.url()).filter(u => u));
 
   // 1. チェックボックスiframe取得→クリック
@@ -55,8 +51,12 @@ async function solveRecaptcha(page) {
   if (!anchorHandle) return false;
   const checkboxFrame = await anchorHandle.contentFrame();
   console.log('[reCAPTCHA] ✅ チェックボックスiframe取得OK');
-  await checkboxFrame.waitForSelector('.recaptcha-checkbox-border', { timeout:10000 });
-  await checkboxFrame.click('.recaptcha-checkbox-border');
+
+  // 人間らしくホバー＋ランダムウェイト
+  const box = await checkboxFrame.waitForSelector('.recaptcha-checkbox-border', { timeout:10000 });
+  await box.hover();
+  await page.waitForTimeout(randomDelay(300, 700));
+  await box.click();
   console.log('[reCAPTCHA] ✅ チェックボックスクリック');
 
   // 2. challenge iframe取得
@@ -82,13 +82,20 @@ async function solveRecaptcha(page) {
   console.log('[reCAPTCHA] ✅ 画像UI描画完了');
 
   // 4. 音声切り替えクリック
-  await challengeFrame.waitForSelector('div.button-holder.audio-button-holder > button', { timeout:15000 });
+  const audioTab = await challengeFrame.waitForSelector('div.button-holder.audio-button-holder > button', { timeout:15000 });
   console.log('[reCAPTCHA] ▶ 音声切り替えボタン検出OK');
-  await challengeFrame.click('div.button-holder.audio-button-holder > button');
+  // マウス移動＋ランダム待機
+  const tabBox = await audioTab.boundingBox();
+  await challengeFrame.mouse.move(
+    tabBox.x + tabBox.width  * Math.random(),
+    tabBox.y + tabBox.height * Math.random(),
+    { steps: 5 }
+  );
+  await page.waitForTimeout(randomDelay(500, 1200));
+  await audioTab.click();
   console.log('[reCAPTCHA] ✅ 音声チャレンジに切り替え');
 
-  // ——— 追加デバッグ① ———
-  // 切り替え直後の audio-button の属性チェック
+  // 追加デバッグ：audio-button 属性チェック
   await challengeFrame.evaluate(() => {
     const btn = document.getElementById('recaptcha-audio-button');
     console.log('[DEBUG] audio-button disabled:', btn ? btn.disabled : '未発見');
@@ -98,7 +105,6 @@ async function solveRecaptcha(page) {
   // 🔘 追加ポイント①: audioボタン有効化待機
   console.log('[reCAPTCHA] ▶ audio ボタン有効化待機');
   try {
-    // disabled 属性が外れるまで待機
     await challengeFrame.waitForFunction(() => {
       const b = document.getElementById('recaptcha-audio-button');
       return b && !b.disabled;
@@ -111,10 +117,13 @@ async function solveRecaptcha(page) {
     return false;
   }
 
-  // 🔄 新bframe取得
+  // 🔄 新 bframe 再取得
   {
     const newB = await waitForSelectorWithRetry(page, 'iframe[src*="/recaptcha/api2/bframe"]', { interval:500, maxRetries:20 }).catch(()=>null);
-    if (newB) { challengeFrame = await newB.contentFrame(); console.log('[reCAPTCHA] 🔄 新bframe取得'); }
+    if (newB) {
+      challengeFrame = await newB.contentFrame();
+      console.log('[reCAPTCHA] 🔄 新bframe取得');
+    }
   }
 
   // 5. 再生ボタン取得
@@ -128,22 +137,20 @@ async function solveRecaptcha(page) {
     return false;
   }
 
-  // 6. 必要要素取得（入力＆DL＆確認）
-  let inputEl, downloadEl, verifyEl;
-  try {
-    inputEl    = await waitForSelectorWithRetry(challengeFrame, '#audio-response', { interval:500, maxRetries:20 });
-    downloadEl = await waitForSelectorWithRetry(challengeFrame, 'a.rc-audiochallenge-tdownload-link', { interval:500, maxRetries:20 });
-    verifyEl   = await waitForSelectorWithRetry(challengeFrame, 'button#recaptcha-verify-button', { interval:500, maxRetries:20 });
-    console.log('[reCAPTCHA] ✅ 入力／DL／確認ボタン取得OK');
-  } catch (err) {
-    console.error('[reCAPTCHA] ❌ 要素取得失敗:', err);
-    return false;
-  }
-
-  // 7. 再生→状態変化待機→テキスト欄待機
-  console.log('[reCAPTCHA] ▶ 再生→状態変化待機');
+  // 7. プレイボタン押下
+  // マウス移動＋ランダム待機
+  const rect = await playBtn.boundingBox();
+  await challengeFrame.mouse.move(
+    rect.x + rect.width  * Math.random(),
+    rect.y + rect.height * Math.random(),
+    { steps: 7 }
+  );
+  await page.waitForTimeout(randomDelay(300, 900));
   await playBtn.click();
-  await challengeFrame.waitForFunction(() => {
+  console.log('[reCAPTCHA] ✅ 再生ボタン押下');
+
+  // 再生中待機＆テキスト欄待機
+  await challengeFrame.waitForFunction(()=>{
     const btn = document.querySelector('button.rc-audiochallenge-play-button');
     return btn && (btn.classList.contains('rc-audiochallenge-playing') || /再生中/.test(btn.innerText));
   }, { timeout:10000 });
@@ -160,6 +167,7 @@ async function solveRecaptcha(page) {
     console.error('[reCAPTCHA] ❌ ダウンロード失敗:', err);
     return false;
   }
+
   let text;
   try {
     text = await transcribeAudio(audioFilePath);
@@ -168,9 +176,10 @@ async function solveRecaptcha(page) {
     console.error('[reCAPTCHA] ❌ Whisper失敗:', err);
     return false;
   }
-  await inputEl.type(text.trim(), { delay:100 });
+
+  await (await challengeFrame.$('#audio-response')).type(text.trim(), { delay: 100 });
   console.log('[reCAPTCHA] ✅ テキスト入力完了');
-  await verifyEl.click();
+  await (await challengeFrame.$('button#recaptcha-verify-button')).click();
   console.log('[reCAPTCHA] ✅ 確認ボタン押下');
 
   await page.waitForTimeout(2000);
