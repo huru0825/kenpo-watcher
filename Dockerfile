@@ -56,6 +56,9 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 
+# ✅ ここを追加（Chromiumをインストール）
+RUN npx puppeteer install
+
 # アプリ全体をコピー
 COPY . .
 
