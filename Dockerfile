@@ -55,7 +55,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 
-# PuppeteerのChromiumをダウンロード
+# Puppeteer用Chromeをインストール
 RUN npx puppeteer install
 
 # アプリ全体をコピー
@@ -64,7 +64,7 @@ COPY . .
 # 実行権限を付与
 RUN chmod +x ./start.sh
 
-# 最後にnodeユーザーに切り替え
+# ここでUSER指定（最後）
 USER node
 
 # start.sh 経由で xvfb 起動 & npm start 実行
