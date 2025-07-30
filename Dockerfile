@@ -44,28 +44,26 @@ RUN apt-get update && apt-get install -y \
   curl \
   && rm -rf /var/lib/apt/lists/*
 
-# PuppeteerのChrome自動DLをスキップ
+# Puppeteer用Chromeの自動DLはスキップ
 ENV PUPPETEER_SKIP_DOWNLOAD=true
 ENV DISPLAY=:99
 
 # 作業ディレクトリ設定
 WORKDIR /app
 
-# パッケージコピー＆インストール
+# パッケージ定義コピーとインストール
 COPY package*.json ./
 RUN npm install
 
-# Chromium を追加インストール
+# Chromium を puppeteer 経由でDL
 RUN npx puppeteer install
 
-# Nodeユーザーへ切り替え（←これを **ここで** ！）
-USER node
-
-# アプリ本体をコピー
+# スクリプトの実行権限を付与（まだ root 権限）
 COPY . .
-
-# 実行権限
 RUN chmod +x ./start.sh
+
+# 最後に node ユーザーに切り替え
+USER node
 
 # アプリ起動
 CMD ["./start.sh"]
