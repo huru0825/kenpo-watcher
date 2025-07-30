@@ -3,11 +3,15 @@ set -euxo pipefail
 
 echo "[start.sh] Starting virtual display and application..."
 
-# 仮想ディスプレイ起動（バックグラウンドで）
-Xvfb :99 -screen 0 1024x768x24 &
+# Display 99 が生きてるなら Xvfb を起動しない
+if [ ! -e /tmp/.X99-lock ]; then
+  Xvfb :99 -screen 0 1024x768x24 &
+else
+  echo "Xvfb :99 already running, skipping..."
+fi
 
-# DISPLAY 環境変数設定
+# DISPLAY 環境変数をセット
 export DISPLAY=:99
 
-# アプリケーション起動（package.json の "start" スクリプトを実行）
+# アプリケーションを起動（package.json の "start"）
 exec npm start
