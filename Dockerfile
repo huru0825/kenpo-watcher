@@ -44,28 +44,27 @@ RUN apt-get update && apt-get install -y \
   curl \
   && rm -rf /var/lib/apt/lists/*
 
-# Puppeteer用Chromeの自動DLはスキップ
+# Puppeteerの自動Chrome DLをスキップ
 ENV PUPPETEER_SKIP_DOWNLOAD=true
 ENV DISPLAY=:99
 
 # 作業ディレクトリ作成
 WORKDIR /app
 
-# パッケージファイルコピー＆依存インストール
+# パッケージ定義をコピー
 COPY package*.json ./
-RUN npm install
 
-# Puppeteer用Chromeをインストール
-RUN npx puppeteer install
+# 権限あるうちに install
+RUN npm install && npx puppeteer install
 
-# アプリ全体をコピー
+# 残りのファイルをコピー
 COPY . .
 
 # 実行権限を付与
 RUN chmod +x ./start.sh
 
-# ここでUSER指定（最後）
+# 最後に node ユーザーへ切替（← ここ！）
 USER node
 
-# start.sh 経由で xvfb 起動 & npm start 実行
+# 起動スクリプト実行
 CMD ["./start.sh"]
