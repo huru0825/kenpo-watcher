@@ -1,6 +1,6 @@
 FROM node:18-slim
 
-# Chrome & XVFBに必要な依存パッケージを導入
+# 必要パッケージのインストール
 RUN apt-get update && apt-get install -y \
   wget \
   ca-certificates \
@@ -44,27 +44,28 @@ RUN apt-get update && apt-get install -y \
   curl \
   && rm -rf /var/lib/apt/lists/*
 
-# Puppeteerの自動Chrome DLをスキップ
+# PuppeteerのChrome自動DLをスキップ
 ENV PUPPETEER_SKIP_DOWNLOAD=true
 ENV DISPLAY=:99
 
-# 作業ディレクトリ作成
+# 作業ディレクトリ設定
 WORKDIR /app
 
-# パッケージ定義をコピー
+# パッケージコピー＆インストール
 COPY package*.json ./
+RUN npm install
 
-# 権限あるうちに install
-RUN npm install && npx puppeteer install
+# Chromium を追加インストール
+RUN npx puppeteer install
 
-# 残りのファイルをコピー
-COPY . .
-
-# 実行権限を付与
-RUN chmod +x ./start.sh
-
-# 最後に node ユーザーへ切替（← ここ！）
+# Nodeユーザーへ切り替え（←これを **ここで** ！）
 USER node
 
-# 起動スクリプト実行
+# アプリ本体をコピー
+COPY . .
+
+# 実行権限
+RUN chmod +x ./start.sh
+
+# アプリ起動
 CMD ["./start.sh"]
