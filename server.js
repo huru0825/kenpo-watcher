@@ -1,7 +1,15 @@
 // server.js
+const express = require('express');
+const app = express();
 
+// appを定義してからルートを追加
 app.get('/', (req, res) => {
   res.send('Kenpo Watcher is alive! 🚀');
+});
+
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => {
+  console.log(`✅ Server listening on port ${PORT}`);
 });
 
 const express = require('express');
@@ -23,7 +31,6 @@ const stealth = StealthPlugin();
 stealth.enabledEvasions.delete('iframe.contentWindow'); // オプション：reCAPTCHA安定化用
 puppeteer.use(stealth);
 
-const app = express();
 app.use(express.json());
 
 // /tmp 以下のファイルを静的に公開（スクショの画像など）
