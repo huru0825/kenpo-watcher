@@ -1,5 +1,9 @@
 // server.js
 
+app.get('/', (req, res) => {
+  res.send('Kenpo Watcher is alive! 🚀');
+});
+
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
