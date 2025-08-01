@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 set -euxo pipefail
 
 echo "[start.sh] Starting virtual display and application..."
