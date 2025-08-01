@@ -70,5 +70,6 @@ RUN chmod +x ./start.sh
 USER node
 
 # start.sh を bash シェルで実行する ENTRYPOINT に変更
-ENTRYPOINT ["bash", "./start.sh"]
-CMD []
+# ENTRYPOINTとCMDを両方明示的に指定
+ENTRYPOINT ["bash"]
+CMD ["./start.sh"]
