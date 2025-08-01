@@ -60,14 +60,14 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 
-# スクリプトやコード類をコピー
+# アプリコードとスクリプトをコピー
 COPY . .
 
-# 実行権限付与
+# 実行権限を付与
 RUN chmod +x ./start.sh
 
 # node ユーザーに切り替え
 USER node
 
-# アプリ起動コマンド（bashで実行）
-CMD ["bash", "./start.sh"]
+# アプリ起動（ENTRYPOINTだけでOK）
+ENTRYPOINT ["bash", "./start.sh"]
