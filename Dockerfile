@@ -69,6 +69,6 @@ RUN chmod +x ./start.sh
 # node ユーザーに切り替え
 USER node
 
-# アプリ起動
+# start.sh を bash シェルで実行する ENTRYPOINT に変更
 ENTRYPOINT ["bash", "./start.sh"]
 CMD []
