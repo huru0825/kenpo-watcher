@@ -6,8 +6,11 @@ puppeteer.use(StealthPlugin());
 
 let launchOptions = {
   headless: true,
+    // これは間違い
+  // executablePath: '/usr/local/bin/google-chrome',
+  
   // ✅ 明示的に実在する Chrome パスを指定
-  executablePath: '/usr/local/bin/google-chrome',
+  executablePath: '/opt/google/chrome/google-chrome',
   args: [
     '--no-sandbox',
     '--disable-setuid-sandbox',
