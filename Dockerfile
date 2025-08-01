@@ -69,5 +69,5 @@ RUN chmod +x ./start.sh
 # node ユーザーに切り替え
 USER node
 
-# アプリ起動
+# アプリ起動コマンド（bashで実行）
 CMD ["bash", "./start.sh"]
