@@ -70,4 +70,4 @@ RUN chmod +x ./start.sh
 USER node
 
 # アプリ起動
-CMD ["./start.sh"]
+CMD [ "sh", "./start.sh" ]
