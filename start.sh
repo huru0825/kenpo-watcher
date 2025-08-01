@@ -13,5 +13,5 @@ fi
 # DISPLAY 環境変数をセット
 export DISPLAY=:99
 
-# アプリケーションを起動（package.json の "start"）
-exec npm start
+# Node.js アプリケーションを直接起動
+exec node server.js
