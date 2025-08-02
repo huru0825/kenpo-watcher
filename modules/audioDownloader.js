@@ -39,7 +39,6 @@ async function solveRecaptcha(page) {
   console.log('[reCAPTCHA] 🔍 frames:', page.frames().map(f => f.url()).filter(u => u));
 
   let checkboxFrame = null;
-  // ① チェックボックスiframe取得とクリックに retry 処理を追加
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       const anchorHandle = await page.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout: 10000 });
@@ -68,7 +67,6 @@ async function solveRecaptcha(page) {
     return false;
   }
 
-  // 以下項目の challengeFrame 処理は existing logic に retry/安定化を加えて継続
   const bframeEl = await waitForSelectorWithRetry(page, 'iframe[src*="/recaptcha/api2/bframe"]', { interval: 1000, maxRetries: 60 }).catch(() => null);
   let challengeFrame = bframeEl ? await bframeEl.contentFrame() : null;
   if (!challengeFrame) {
@@ -81,11 +79,11 @@ async function solveRecaptcha(page) {
   }
   console.log('[reCAPTCHA] ✅ challenge iframe取得OK');
 
-  // UI描画待機・切替判定などを既存ロジック通り実行
   const tmp = path.resolve(__dirname, '../tmp');
   fs.mkdirSync(tmp, { recursive: true });
   const shot = path.join(tmp, `challenge-debug-${Date.now()}.png`);
   await page.screenshot({ path: shot, fullPage: true });
+
   await challengeFrame.waitForSelector('.rc-imageselect-payload', { timeout: 15000 });
   const isAlreadyAudio = await challengeFrame.$('.rc-audiochallenge');
   if (!isAlreadyAudio) {
