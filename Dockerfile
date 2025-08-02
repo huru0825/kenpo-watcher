@@ -1,6 +1,6 @@
 FROM node:18-slim
 
-# 必要パッケージのインストール + Google Chrome の追加
+# Google Chrome + Puppeteer 依存パッケージをインストール
 RUN apt-get update && apt-get install -y \
   wget \
   ca-certificates \
@@ -48,28 +48,27 @@ RUN apt-get update && apt-get install -y \
   && apt-get update && apt-get install -y google-chrome-stable \
   && rm -rf /var/lib/apt/lists/*
 
-# Puppeteer用Chromeの自動DLはスキップ
+# Puppeteer に Chrome を自動DLさせない + 実行パス指定
 ENV PUPPETEER_SKIP_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome
 ENV DISPLAY=:99
 
-# 作業ディレクトリ設定
+# 作業ディレクトリ
 WORKDIR /app
 
-# パッケージ定義コピーとインストール
+# 依存関係インストール
 COPY package*.json ./
 RUN npm install
 
-# アプリコードとスクリプトをコピー
+# アプリ本体と起動スクリプトをコピー
 COPY . .
 
-# 実行権限を付与
+# 起動スクリプトに実行権限付与
 RUN chmod +x ./start.sh
 
-# node ユーザーに切り替え
+# nodeユーザーで動作
 USER node
 
-# start.sh を bash シェルで実行する ENTRYPOINT に変更
-# ENTRYPOINTとCMDを両方明示的に指定
+# ENTRYPOINTとCMDの明示指定
 ENTRYPOINT ["bash"]
 CMD ["./start.sh"]
