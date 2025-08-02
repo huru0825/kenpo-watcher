@@ -1,3 +1,5 @@
+// server.js
+
 process.on('unhandledRejection', (reason) => {
   console.error('UnhandledRejection captured:', reason);
   process.exit(1);
@@ -7,8 +9,6 @@ process.on('uncaughtException', (error) => {
   process.exit(1);
 });
 
-
-// server.js
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
@@ -29,14 +29,14 @@ const stealth = StealthPlugin();
 stealth.enabledEvasions.delete('iframe.contentWindow'); // reCAPTCHA安定化用
 puppeteer.use(stealth);
 
-const app = express(); // ← ここを先に定義
+const app = express();
 
 app.use(express.json());
 
-// /tmp 以下のファイルを静的に公開（スクショ画像など）
+// /tmp を静的ファイルとして提供
 app.use('/tmp', express.static(path.join(__dirname, 'tmp')));
 
-// 生存確認ルート
+// 生存確認用エンドポイント
 app.get('/', (req, res) => {
   res.send('Kenpo Watcher is alive! 🚀');
 });
@@ -44,7 +44,7 @@ app.get('/', (req, res) => {
 // ヘルスチェック
 app.get('/health', (req, res) => res.send('OK'));
 
-// run() を叩くハンドラ（GET / POST 両方対応）
+// /run エンドポイント定義
 const handleRun = async (req, res) => {
   try {
     const result = await run();
@@ -68,7 +68,7 @@ const handleRun = async (req, res) => {
 app.get('/run', handleRun);
 app.post('/run', handleRun);
 
-// Main関数でPuppeteerとサーバー起動
+// メイン関数
 async function main() {
   const selectedCookies = await selectCookies();
 
@@ -76,13 +76,14 @@ async function main() {
     puppeteer,
     launchOptions: {
       executablePath: CHROME_PATH,
-      headless: 'new',
+      headless: 'new', // Puppeteer v21+ 推奨オプション
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-web-security',
         '--disable-features=IsolateOrigins,site-per-process',
-        '--disable-blink-features=AutomationControlled'
+        '--disable-blink-features=AutomationControlled',
+        '--window-size=1024,768'
       ]
     },
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/115.0.0.0 Safari/537.36',
