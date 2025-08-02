@@ -28,13 +28,32 @@ async function run() {
   try {
     console.log('[run] 実行開始');
 
-    // ブラウザ起動
     browserA = await launchBrowser();
     const pageA = await browserA.newPage();
+
+    // 🔧 追加対策1: ビューポート偽装
+    await pageA.setViewport({ width: 1280, height: 800 });
+
+    // 🔧 追加対策2: navigator/WebGL 偽装
+    await pageA.evaluateOnNewDocument(() => {
+      Object.defineProperty(navigator, 'webdriver', { get: () => false });
+      const canvas = document.createElement('canvas');
+      const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+      if (gl) {
+        Object.defineProperty(WebGLRenderingContext.prototype, 'getParameter', {
+          value: (parameter) => {
+            if (parameter === gl.ALIASED_LINE_WIDTH_RANGE) {
+              return [1, 1];
+            }
+            return WebGLRenderingContext.prototype.getParameter.call(this, parameter);
+          }
+        });
+      }
+    });
+
     await pageA.setUserAgent(sharedContext.userAgent);
     await pageA.setExtraHTTPHeaders(sharedContext.headers);
 
-    // cookie 注入
     if (sharedContext.cookies?.length) {
       console.log('[run] スプレッドシートから Cookie 注入');
       await pageA.setCookie(...sharedContext.cookies);
@@ -42,18 +61,15 @@ async function run() {
       console.log('[run] シートにCookieなし → Cookie注入スキップ');
     }
 
-    // TOP ページへ
     console.log('[run] TOPページアクセス');
     await pageA.goto(sharedContext.url, { waitUntil: 'networkidle2', timeout: 0 });
 
-    // カレンダーリンクをクリックして reCAPTCHA iframe を待つ
     console.log('[run] カレンダーリンククリック');
     await Promise.all([
       pageA.click('a[href*="/calendar_apply"]'),
       pageA.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout: 60000 })
     ]);
 
-    // reCAPTCHA を突破
     console.log('[run] reCAPTCHA 突破開始');
     const success = await solveRecaptcha(pageA);
     if (!success) {
@@ -66,7 +82,6 @@ async function run() {
     }
     console.log('[run] ✅ reCAPTCHA bypass succeeded');
 
-    // iframe 内チェックボックスがチェックされたことを確認
     await pageA.waitForFunction(() => {
       const iframe = document.querySelector('iframe[src*="/recaptcha/api2/anchor"]');
       if (!iframe) return false;
@@ -75,7 +90,6 @@ async function run() {
     }, { timeout: 10000 });
     console.log('[run] reCAPTCHA チェック確認済み');
 
-    // 「次へ」を押してカレンダーを待機
     console.log('[run] 「次へ」ボタン押下＆カレンダー待機');
     await Promise.all([
       pageA.waitForResponse(r =>
@@ -85,7 +99,6 @@ async function run() {
     ]);
     await waitCalendar(pageA);
 
-    // 空き状況チェックのシーケンス
     const sequence = [
       { action: null, includeDate: true },
       { action: nextMonth, includeDate: false },
@@ -107,24 +120,41 @@ async function run() {
         }
       }
     }
+
     if (!notified.size) {
       await sendNoVacancyNotice();
     }
 
-    // 初回実行なら cookie を保存
     if (!sharedContext.cookies?.length) {
       console.log('[run] シート空 → 現行Cookieを保存');
       const current = await pageA.cookies();
       await saveCookies(current);
     }
 
-    // browserA を閉じて、ブラウザB で cookie 更新
     await browserA.close();
     browserA = null;
 
     console.log('[run] Bブラウザ起動（Cookie更新）');
     browserB = await launchBrowser();
     const pageB = await browserB.newPage();
+
+    await pageB.setViewport({ width: 1280, height: 800 });
+    await pageB.evaluateOnNewDocument(() => {
+      Object.defineProperty(navigator, 'webdriver', { get: () => false });
+      const canvas = document.createElement('canvas');
+      const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+      if (gl) {
+        Object.defineProperty(WebGLRenderingContext.prototype, 'getParameter', {
+          value: (parameter) => {
+            if (parameter === gl.ALIASED_LINE_WIDTH_RANGE) {
+              return [1, 1];
+            }
+            return WebGLRenderingContext.prototype.getParameter.call(this, parameter);
+          }
+        });
+      }
+    });
+
     await pageB.setUserAgent(sharedContext.userAgent);
     await pageB.setExtraHTTPHeaders(sharedContext.headers);
 
