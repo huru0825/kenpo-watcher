@@ -91,7 +91,8 @@ async function solveRecaptcha(page) {
     const audioTab = await challengeFrame.$('div.button-holder.audio-button-holder > button');
     if (!audioTab) {
       console.warn('[reCAPTCHA] ⚠️ 音声切り替えボタンが見つからない');
-      await challengeFrame.screenshot({ path: `tmp/no-audio-${Date.now()}.png` });
+      const noAudioShot = path.join(tmp, `no-audio-${Date.now()}.png`);
+      await challengeFrame.screenshot({ path: noAudioShot });
       return false;
     }
     const box = await audioTab.boundingBox();
