@@ -1,6 +1,6 @@
 FROM node:18-slim
 
-# Puppeteer に必要な依存パッケージと Chrome をインストール
+# Puppeteerに必要な依存パッケージとChromeをインストール
 RUN apt-get update && apt-get install -y \
   wget \
   ca-certificates \
@@ -52,23 +52,18 @@ ENV PUPPETEER_SKIP_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome
 ENV DISPLAY=:99
 
-# 作業ディレクトリ
 WORKDIR /app
 
-# 依存関係
 COPY package*.json ./
 RUN npm install
 
-# アプリ本体
 COPY . .
 
-# tmp ディレクトリ作成＆権限付与（ここが重要）
-RUN mkdir -p /app/tmp && chown node:node /app/tmp && chmod 700 /app/tmp
+# 👇 ここ！ nodeで書き込みできるようにする
+RUN mkdir -p /app/tmp && chmod 777 /app/tmp
 
-# スクリプト実行権限
 RUN chmod +x ./start.sh
 
-# nodeユーザーに切り替え
 USER node
 
 ENTRYPOINT ["bash"]
