@@ -48,24 +48,19 @@ RUN apt-get update && apt-get install -y \
   apt-get update && apt-get install -y google-chrome-stable && \
   rm -rf /var/lib/apt/lists/*
 
-# PuppeteerとXvfbの環境変数
 ENV PUPPETEER_SKIP_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome
 ENV DISPLAY=:99
 
 WORKDIR /app
 
-# 依存関係インストール
 COPY package*.json ./
 RUN npm install
 
-# アプリコードコピー
 COPY . .
 
-# 👇 Nodeが確実に書き込める共有ディレクトリ
-RUN mkdir -p /tmp/challenges && chmod 777 /tmp/challenges
+# ⚠️ tmpディレクトリ作らない！/tmpを使う
 
-# 起動スクリプト実行権限
 RUN chmod +x ./start.sh
 
 USER node
