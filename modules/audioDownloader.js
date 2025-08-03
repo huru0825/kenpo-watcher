@@ -78,8 +78,8 @@ async function solveRecaptcha(page) {
     return false;
   }
   console.log('[reCAPTCHA] ✅ challenge iframe取得OK');
-
-  const tmp = path.resolve(__dirname, '../tmp');
+  
+  const tmp = process.env.LOCAL_SCREENSHOT_DIR || '/tmp/screenshots';
   fs.mkdirSync(tmp, { recursive: true });
   const shot = path.join(tmp, `challenge-debug-${Date.now()}.png`);
   await page.screenshot({ path: shot, fullPage: true });
