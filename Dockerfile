@@ -1,6 +1,6 @@
 FROM node:18-slim
 
-# Google Chrome + Puppeteer 依存パッケージをインストール
+# Puppeteerに必要な依存パッケージとChromeをインストール
 RUN apt-get update && apt-get install -y \
   wget \
   ca-certificates \
@@ -42,13 +42,12 @@ RUN apt-get update && apt-get install -y \
   xvfb \
   xauth \
   curl \
-  gnupg \
-  && wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
-  && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google.list \
-  && apt-get update && apt-get install -y google-chrome-stable \
-  && rm -rf /var/lib/apt/lists/*
+  gnupg && \
+  wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - && \
+  echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google.list && \
+  apt-get update && apt-get install -y google-chrome-stable && \
+  rm -rf /var/lib/apt/lists/*
 
-# Puppeteer に Chrome を自動DLさせない + 実行パス指定
 ENV PUPPETEER_SKIP_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome
 ENV DISPLAY=:99
@@ -56,22 +55,21 @@ ENV DISPLAY=:99
 # 作業ディレクトリ
 WORKDIR /app
 
-# スクリーンショット保存用ディレクトリを作成＋パーミッション許可
-RUN mkdir -p /app/tmp && chmod 777 /app/tmp && chown -R node:node /app/tmp
-
-# 依存関係インストール
+# package.json と lock を先にコピーして依存解決
 COPY package*.json ./
 RUN npm install
 
-# アプリ本体と起動スクリプトをコピー
+# アプリ本体コピー
 COPY . .
 
-# 起動スクリプトに実行権限付与
+# tmpディレクトリ作成＆nodeユーザーにオーナー変更
+RUN mkdir -p /app/tmp && chown node:node /app/tmp && chmod 777 /app/tmp
+
+# start.sh 実行権限付与
 RUN chmod +x ./start.sh
 
-# nodeユーザーで動作
+# nodeユーザーへ切り替え
 USER node
 
-# ENTRYPOINTとCMDの明示指定
 ENTRYPOINT ["bash"]
 CMD ["./start.sh"]
