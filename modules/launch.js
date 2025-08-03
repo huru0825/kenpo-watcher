@@ -7,7 +7,7 @@ puppeteer.use(StealthPlugin());
 // Puppeteerの実行オプションを定義
 let launchOptions = {
   headless: false,
-  executablePath: '/usr/bin/google-chrome', // Dockerfile で指定したChromeのパスと合わせる
+  executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/opt/google/chrome/google-chrome',
   args: [
     '--no-sandbox',
     '--disable-setuid-sandbox',
