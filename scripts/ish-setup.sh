@@ -22,5 +22,5 @@ ssh -p "$SSH_PORT" -i ~/.ssh/id_rsa "$SSH_USER@$REMOTE_HOST" "\
   cd $REMOTE_DIR && \
   git fetch origin && git reset --hard origin/main && \
   docker build -t kenpo-watcher . && \
-  docker run --rm -it -p 10000:10000 --env-file .env kenpo-watcher \
+  docker run -it -p 10000:10000 --env-file .env kenpo-watcher \
 "
