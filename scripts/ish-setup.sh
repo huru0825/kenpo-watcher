@@ -12,7 +12,7 @@ REMOTE_DIR=$(grep REMOTE_DIR .env | cut -d '=' -f2)
 
 echo "🛂 .env を転送"
 scp -P "$SSH_PORT" -i ~/.ssh/id_rsa \
-  /mnt/Documents/kenpo-watcher/.env \
+  /mnt/Documents/.env \
   "$SSH_USER@$REMOTE_HOST:$REMOTE_DIR/.env"
 
 echo "📡 SSH 経由で Git Pull & Docker 起動"
