@@ -14,9 +14,10 @@ async function downloadAudioFromPage(frame) {
     { timeout: 15000 }
   );
   const audioBuffer = await audioResponse.buffer();
-  const tmpDir = path.resolve(__dirname, '../tmp');
+  const tmpDir = process.env.LOCAL_SCREENSHOT_DIR || '/tmp/screenshots';
   fs.mkdirSync(tmpDir, { recursive: true });
   const filePath = path.join(tmpDir, `audio_${Date.now()}.mp3`);
+
   fs.writeFileSync(filePath, audioBuffer);
   console.log(`[reCAPTCHA] ✅ 音声ファイル保存完了: ${filePath}`);
   return filePath;
