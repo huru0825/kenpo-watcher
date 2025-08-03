@@ -25,5 +25,5 @@ ssh -p "$SSH_PORT" -i ~/.ssh/id_rsa "$SSH_USER@$REMOTE_HOST" "\
   docker run -it \
   -p 10000:10000 \
   --env-file .env \
-  -v /mnt/Documents/screenshots:/mnt/Documents/screenshots \
+  -v /mnt/Documents/screenshots:/home/screenshots \
   kenpo-watcher"
