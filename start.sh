@@ -1,4 +1,5 @@
 #!/bin/bash
+
 set -euxo pipefail
 
 echo "[start.sh] Starting virtual display and application..."
@@ -21,7 +22,6 @@ fi
 # USE_SCREENSHOT_TRANSFER=true のときだけ転送処理を開始
 if [ "${USE_SCREENSHOT_TRANSFER:-false}" = "true" ]; then
   echo "[start.sh] Screenshot transfer enabled"
-  mkdir -p "$LOCAL_SCREENSHOT_DIR"
 
   (
   while true; do
