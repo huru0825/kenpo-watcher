@@ -62,8 +62,8 @@ RUN npm install
 # アプリ本体コピー
 COPY . .
 
-# tmpディレクトリ作成＆nodeユーザーにオーナー変更
-RUN mkdir -p /app/tmp && chown node:node /app/tmp && chmod 777 /app/tmp
+# スクリーンショット保存用ディレクトリを作成＋所有権変更
+RUN mkdir -p /app/tmp && chown node:node /app/tmp
 
 # start.sh 実行権限付与
 RUN chmod +x ./start.sh
