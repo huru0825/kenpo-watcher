@@ -56,6 +56,9 @@ ENV DISPLAY=:99
 # 作業ディレクトリ
 WORKDIR /app
 
+# スクリーンショット保存用ディレクトリを作成＋パーミッション許可
+RUN mkdir -p /app/tmp && chmod 777 /app/tmp
+
 # 依存関係インストール
 COPY package*.json ./
 RUN npm install
