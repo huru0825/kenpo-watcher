@@ -1,5 +1,7 @@
 // index.js
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '.env.production') }); // 明示パス指定
+
 const fs = require('fs');
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
@@ -30,11 +32,8 @@ async function run() {
 
     browserA = await launchBrowser();
     const pageA = await browserA.newPage();
-
-    // 🔧 追加対策1: ビューポート偽装
     await pageA.setViewport({ width: 1280, height: 800 });
 
-    // 🔧 追加対策2: navigator/WebGL 偽装
     await pageA.evaluateOnNewDocument(() => {
       Object.defineProperty(navigator, 'webdriver', { get: () => false });
       const canvas = document.createElement('canvas');
@@ -57,8 +56,6 @@ async function run() {
     if (sharedContext.cookies?.length) {
       console.log('[run] スプレッドシートから Cookie 注入');
       await pageA.setCookie(...sharedContext.cookies);
-    } else {
-      console.log('[run] シートにCookieなし → Cookie注入スキップ');
     }
 
     console.log('[run] TOPページアクセス');
@@ -74,8 +71,9 @@ async function run() {
     const success = await solveRecaptcha(pageA);
     if (!success) {
       console.error('[run] ❌ solveRecaptcha failed');
-      fs.mkdirSync('tmp', { recursive: true });
-      const screenshotPath = 'tmp/recaptcha-fail.png';
+      const tmp = process.env.LOCAL_SCREENSHOT_DIR || '/tmp/screenshots';
+      fs.mkdirSync(tmp, { recursive: true });
+      const screenshotPath = path.join(tmp, 'recaptcha-fail.png');
       await pageA.screenshot({ path: screenshotPath, fullPage: true });
       console.log(`[run] ⚠️ スクリーンショット保存: ${screenshotPath}`);
       throw new Error('reCAPTCHA 突破に失敗したため処理を中断します');
@@ -88,9 +86,10 @@ async function run() {
       const anchor = iframe.contentDocument?.querySelector('#recaptcha-anchor');
       return anchor?.getAttribute('aria-checked') === 'true';
     }, { timeout: 10000 });
-    console.log('[run] reCAPTCHA チェック確認済み');
 
+    console.log('[run] reCAPTCHA チェック確認済み');
     console.log('[run] 「次へ」ボタン押下＆カレンダー待機');
+
     await Promise.all([
       pageA.waitForResponse(r =>
         r.url().includes('/calendar_apply/calendar_select') && r.status() === 200
@@ -121,12 +120,9 @@ async function run() {
       }
     }
 
-    if (!notified.size) {
-      await sendNoVacancyNotice();
-    }
+    if (!notified.size) await sendNoVacancyNotice();
 
     if (!sharedContext.cookies?.length) {
-      console.log('[run] シート空 → 現行Cookieを保存');
       const current = await pageA.cookies();
       await saveCookies(current);
     }
@@ -134,7 +130,6 @@ async function run() {
     await browserA.close();
     browserA = null;
 
-    console.log('[run] Bブラウザ起動（Cookie更新）');
     browserB = await launchBrowser();
     const pageB = await browserB.newPage();
 
@@ -159,16 +154,14 @@ async function run() {
     await pageB.setExtraHTTPHeaders(sharedContext.headers);
 
     if (sharedContext.cookies?.length) {
-      console.log('[run] Bブラウザに Cookie 注入');
       await pageB.setCookie(...sharedContext.cookies);
-    } else {
-      console.log('[run] Bブラウザ Cookie 注入スキップ');
     }
 
     await pageB.goto(sharedContext.url, { waitUntil: 'networkidle2', timeout: 0 });
     await updateCookiesIfValid(pageB);
 
     console.log('[run] 全処理完了');
+
   } catch (err) {
     console.error('⚠️ 例外発生:', err);
     await sendErrorNotification(err);
