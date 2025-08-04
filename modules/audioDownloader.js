@@ -4,6 +4,22 @@ const fs = require('fs');
 const path = require('path');
 const { transcribeAudio } = require('./whisper');
 
+function copyToDocuments(srcPath) {
+  const documentsDir = '/mnt/Documents/screenshots';
+  try {
+    fs.mkdirSync(documentsDir, { recursive: true });
+    const fileName = path.basename(srcPath);
+    const destPath = path.join(documentsDir, fileName);
+    fs.copyFileSync(srcPath, destPath);
+    console.log(`[copy] 📁 ${srcPath} → ${destPath}`);
+  } catch (err) {
+    console.warn('[copy] ❌ 転送失敗:', err.message);
+  }
+}
+fs.writeFileSync(filePath, audioBuffer);
+copyToDocuments(filePath);
+
+
 async function downloadAudioFromPage(frame) {
   console.log('[reCAPTCHA] 🎧 音声チャレンジの音源をネットワーク経由でキャッチ中…');
   const page = frame.page ? frame.page() : frame._page;
