@@ -5,8 +5,6 @@ require('dotenv').config({
   debug: true
 });
 
-
-dotenv.config({ path: 'kenpo-watcher.env' }) 
 process.on('unhandledRejection', (reason) => {
   console.error('UnhandledRejection captured:', reason);
   process.exit(1);
@@ -18,7 +16,6 @@ process.on('uncaughtException', (error) => {
 
 const express = require('express');
 const fs = require('fs');
-const path = require('path');
 
 const { run, warmup, setSharedContext } = require('./index');
 const {
@@ -37,7 +34,6 @@ stealth.enabledEvasions.delete('iframe.contentWindow'); // reCAPTCHA安定化用
 puppeteer.use(stealth);
 
 const app = express();
-
 app.use(express.json());
 
 // /tmp を静的ファイルとして提供
@@ -83,7 +79,7 @@ async function main() {
     puppeteer,
     launchOptions: {
       executablePath: CHROME_PATH,
-      headless: 'new', // Puppeteer v21+ 推奨オプション
+      headless: 'new',
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
