@@ -1,6 +1,6 @@
 // index.js
 const path = require('path');
-require('dotenv').config({ path: path.resolve(__dirname, '.env.production') }); // 明示パス指定
+require('dotenv').config({ path: path.resolve(__dirname, 'kenpo-watcher.env') }); // 明示パス指定
 
 const fs = require('fs');
 const puppeteer = require('puppeteer-extra');
