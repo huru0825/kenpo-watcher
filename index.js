@@ -1,8 +1,23 @@
 // index.js
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, 'kenpo-watcher.env') }); // 明示パス指定
-
 const fs = require('fs');
+
+function copyToDocuments(srcPath) {
+  const documentsDir = '/mnt/Documents/screenshots';
+  try {
+    fs.mkdirSync(documentsDir, { recursive: true });
+    const fileName = path.basename(srcPath);
+    const destPath = path.join(documentsDir, fileName);
+    fs.copyFileSync(srcPath, destPath);
+    console.log(`[copy] 📁 ${srcPath} → ${destPath}`);
+  } catch (err) {
+    console.warn('[copy] ❌ 転送失敗:', err.message);
+  }
+}
+await pageA.screenshot({ path: screenshotPath, fullPage: true });
+copyToDocuments(screenshotPath);
+
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const { launchBrowser } = require('./modules/launch');
