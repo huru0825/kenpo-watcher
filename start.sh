@@ -25,7 +25,7 @@ if [ "${USE_SCREENSHOT_TRANSFER:-false}" = "true" ]; then
 
   (
   while true; do
-    scp -q ${SSH_USER}@${REMOTE_HOST}:${REMOTE_DIR}/*.png "$LOCAL_SCREENSHOT_DIR" 2>/dev/null || true
+    scp -i ~/.ssh/id_rsa -q ${SSH_USER}@${REMOTE_HOST}:${REMOTE_DIR}/*.png "$LOCAL_SCREENSHOT_DIR" 2>/dev/null || true
 
     for file in "$LOCAL_SCREENSHOT_DIR"/challenge-debug-*.png; do
       [ -f "$file" ] || continue
