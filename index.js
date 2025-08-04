@@ -15,8 +15,6 @@ function copyToDocuments(srcPath) {
     console.warn('[copy] ❌ 転送失敗:', err.message);
   }
 }
-await pageA.screenshot({ path: screenshotPath, fullPage: true });
-copyToDocuments(screenshotPath);
 
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
@@ -90,6 +88,7 @@ async function run() {
       fs.mkdirSync(tmp, { recursive: true });
       const screenshotPath = path.join(tmp, 'recaptcha-fail.png');
       await pageA.screenshot({ path: screenshotPath, fullPage: true });
+      copyToDocuments(screenshotPath);
       console.log(`[run] ⚠️ スクリーンショット保存: ${screenshotPath}`);
       throw new Error('reCAPTCHA 突破に失敗したため処理を中断します');
     }
