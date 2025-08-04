@@ -1,5 +1,5 @@
 // server.js
-
+dotenv.config({ path: 'kenpo-watcher.env' }) 
 process.on('unhandledRejection', (reason) => {
   console.error('UnhandledRejection captured:', reason);
   process.exit(1);
