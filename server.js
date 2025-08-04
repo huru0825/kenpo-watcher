@@ -1,4 +1,11 @@
 // server.js
+const path = require('path');
+require('dotenv').config({
+  path: path.resolve(__dirname, 'kenpo-watcher.env'),
+  debug: true
+});
+
+
 dotenv.config({ path: 'kenpo-watcher.env' }) 
 process.on('unhandledRejection', (reason) => {
   console.error('UnhandledRejection captured:', reason);
