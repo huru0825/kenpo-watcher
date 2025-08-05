@@ -64,6 +64,8 @@ COPY . .
 RUN mkdir -p /mnt/Documents/screenshots && \
     chown -R node:node /mnt/Documents
 
+RUN mkdir -p /home/screenshots && chown -R node:node /home/screenshots
+
 RUN chmod +x ./start.sh
 
 # 権限切り替え
