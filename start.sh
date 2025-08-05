@@ -9,6 +9,9 @@ if [ -f .env ]; then
   export $(grep -v '^#' .env | xargs)
 fi
 
+# 📁 スクショ保存先（未定義なら /home/screenshots）
+export LOCAL_SCREENSHOT_DIR=${LOCAL_SCREENSHOT_DIR:-/home/screenshots}
+
 # DISPLAY 環境変数
 export DISPLAY=:99
 
