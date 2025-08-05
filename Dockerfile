@@ -60,9 +60,13 @@ RUN npm install
 
 COPY . .
 
+# スクリーンショット保存ディレクトリの作成とパーミッション設定
+RUN mkdir -p /mnt/Documents/screenshots && \
+    chown -R node:node /mnt/Documents
+
 RUN chmod +x ./start.sh
 
-# 権限切り替え（実行ファイルにbash必要なためnode:nodeで動作OK）
+# 権限切り替え
 RUN chown -R node:node /app
 USER node
 
