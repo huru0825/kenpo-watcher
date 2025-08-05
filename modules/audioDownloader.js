@@ -5,7 +5,7 @@ const path = require('path');
 const { transcribeAudio } = require('./whisper');
 
 function copyToDocuments(srcPath) {
-  const documentsDir = '/mnt/Documents/screenshots';
+  const documentsDir = '/home/screenshots';  
   try {
     fs.mkdirSync(documentsDir, { recursive: true });
     const fileName = path.basename(srcPath);
