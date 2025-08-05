@@ -1,9 +1,10 @@
 FROM node:18-slim
 
-# Puppeteerに必要な依存パッケージとChromeをインストール
+# Puppeteer + Chrome + Xvfb + bash を含む依存パッケージをインストール
 RUN apt-get update && apt-get install -y \
   wget \
   ca-certificates \
+  bash \
   fonts-liberation \
   libappindicator3-1 \
   libasound2 \
@@ -59,11 +60,9 @@ RUN npm install
 
 COPY . .
 
-# ⚠️ tmpディレクトリ作らない！/tmpを使う
-
 RUN chmod +x ./start.sh
 
-# ノードユーザーに権限付与してから切り替え
+# 権限切り替え（実行ファイルにbash必要なためnode:nodeで動作OK）
 RUN chown -R node:node /app
 USER node
 
