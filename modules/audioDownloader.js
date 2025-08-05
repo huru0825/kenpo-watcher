@@ -16,9 +16,6 @@ function copyToDocuments(srcPath) {
     console.warn('[copy] ❌ 転送失敗:', err.message);
   }
 }
-fs.writeFileSync(filePath, audioBuffer);
-copyToDocuments(filePath);
-
 
 async function downloadAudioFromPage(frame) {
   console.log('[reCAPTCHA] 🎧 音声チャレンジの音源をネットワーク経由でキャッチ中…');
@@ -35,6 +32,8 @@ async function downloadAudioFromPage(frame) {
   const filePath = path.join(tmpDir, `audio_${Date.now()}.mp3`);
 
   fs.writeFileSync(filePath, audioBuffer);
+  copyToDocuments(filePath);
+
   console.log(`[reCAPTCHA] ✅ 音声ファイル保存完了: ${filePath}`);
   return filePath;
 }
