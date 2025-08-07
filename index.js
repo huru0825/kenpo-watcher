@@ -23,7 +23,7 @@ const { waitCalendar, nextMonth, prevMonth } = require('./modules/navigate');
 const { visitMonth } = require('./modules/visitMonth');
 const { sendNotification, sendNoVacancyNotice, sendErrorNotification } = require('./modules/notifier');
 const { updateCookiesIfValid, saveCookies } = require('./modules/cookieUpdater');
-const { solveRecaptcha } = require('./modules/audioDownloader');
+const { solveRecaptcha } = require('./modules/recaptchaSolver'); // ← 差し替え済み
 const { INDEX_URL } = require('./modules/constants');
 
 puppeteer.use(StealthPlugin());
@@ -48,7 +48,7 @@ async function run() {
     await pageA.setUserAgent(sharedContext.userAgent);
     await pageA.setExtraHTTPHeaders(sharedContext.headers);
 
-    // --- Cookie 注入処理開始 ---
+    // Cookie 注入処理
     if (sharedContext.cookies?.length) {
       console.log('[run] スプレッドシートから Cookie 注入');
       await pageA.setCookie(...sharedContext.cookies);
@@ -56,7 +56,7 @@ async function run() {
       console.log('[run] ローカル Cookie.json から Cookie 注入');
       const raw = fs.readFileSync('./Cookie.json', 'utf8');
       const cookies = JSON.parse(raw);
-      const clean = cookies.map((c)=>({
+      const clean = cookies.map((c) => ({
         name: c.name,
         value: c.value,
         domain: c.domain,
@@ -71,6 +71,7 @@ async function run() {
 
     console.log('[run] TOPページアクセス');
     await pageA.goto(sharedContext.url, { waitUntil: 'networkidle2', timeout: 0 });
+
     console.log('[run] カレンダーリンククリック');
     await Promise.all([
       pageA.click('a[href*="/calendar_apply"]'),
@@ -90,20 +91,45 @@ async function run() {
     }
     console.log('[run] ✅ reCAPTCHA bypass succeeded');
 
-    // カレンダー選択以降の処理...
     await waitCalendar(pageA);
-    // 通知処理...
 
+    // 通知対象月の探索
+    const sequence = [
+      { action: null, includeDate: true },
+      { action: nextMonth, includeDate: false },
+      { action: nextMonth, includeDate: false },
+      { action: prevMonth, includeDate: false },
+      { action: prevMonth, includeDate: true }
+    ];
+    const notified = new Set();
+    for (const { action, includeDate } of sequence) {
+      if (action) {
+        console.log(`[run] 月移動: ${action.name}`);
+        await action(pageA);
+      }
+      const hits = await visitMonth(pageA, includeDate);
+      for (const label of hits) {
+        if (!notified.has(label)) {
+          notified.add(label);
+          await sendNotification(label);
+        }
+      }
+    }
+
+    if (!notified.size) await sendNoVacancyNotice();
+
+    // Cookie 保存
     if (!sharedContext.cookies?.length) {
       const current = await pageA.cookies();
-      saveCookies(current);
+      await saveCookies(current);
       fs.writeFileSync('Cookie.json', JSON.stringify(current, null, 2));
       console.log('[run] ✅ Cookie.json に保存完了');
     }
 
-    await browserA.close(); browserA = null;
+    await browserA.close();
+    browserA = null;
 
-    // --- ブラウザB で Cookie 更新検証など ---
+    // Cookie 更新チェック用ブラウザ
     browserB = await launchBrowser();
     const pageB = await browserB.newPage();
     await pageB.setViewport({ width: 1280, height: 800 });
