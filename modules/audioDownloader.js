@@ -137,8 +137,9 @@ async function solveRecaptcha(page) {
       playBtn = await waitForSelectorWithRetry(challengeFrame, 'button.rc-audiochallenge-play-button', { interval: 500, maxRetries: 20 });
       await playBtn.click();
       await challengeFrame.waitForFunction(() => {
-        const btn = document.querySelector('button.rc-audiochallenge-play-button');
-        return btn && (btn.classList.contains('rc-audiochallenge-playing') || /再生中/.test(btn.innerText));
+        const btn = document.getElementById('recaptcha-audio-button');
+        const audioUI = document.querySelector('.rc-audiochallenge');
+        return audioUI && btn && !btn.disabled;
       }, { timeout: 10000 });
       console.log('[reCAPTCHA] ✅ 再生ボタン押下 and 再生中確認');
       break;
