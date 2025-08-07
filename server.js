@@ -30,7 +30,8 @@ const { selectCookies } = require('./modules/cookieSelector');
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const stealth = StealthPlugin();
-stealth.enabledEvasions.delete('iframe.contentWindow'); // reCAPTCHA安定化用
+// デバッグ用に削除
+//stealth.enabledEvasions.delete('iframe.contentWindow'); // reCAPTCHA安定化用
 puppeteer.use(stealth);
 
 const app = express();
