@@ -62,10 +62,12 @@ async function solveRecaptcha(page) {
     const titleHandle = await page.$('iframe[title*="recaptcha challenge"]');
     if (titleHandle) challengeFrame = await titleHandle.contentFrame();
   }
+
   if (!challengeFrame) {
     console.error('[reCAPTCHA] ❌ challenge iframe取得失敗');
     return false;
   }
+
   console.log('[reCAPTCHA] ✅ challenge iframe取得OK');
 
   const tmp = process.env.LOCAL_SCREENSHOT_DIR || '/tmp/screenshots';
@@ -93,16 +95,15 @@ async function solveRecaptcha(page) {
     console.log('[recaptchaSolver] 🎧 既に音声チャレンジ');
   }
 
-  // ✅ ここを waitForFunction に変更
   try {
     await challengeFrame.waitForFunction(() => {
       const audio = document.querySelector('.rc-audiochallenge');
       const btn = document.getElementById('recaptcha-audio-button');
       return audio && btn && !btn.disabled;
     }, { timeout: 30000 });
-  } catch {
+  } catch (err) {
     await page.screenshot({ path: path.join(tmp, `audio-ui-not-shown-${Date.now()}.png`), fullPage: true });
-    console.warn('[recaptchaSolver] 音声UI出現せずタイムアウト');
+    console.warn('[recaptchaSolver] 音声UI出現せずタイムアウト:', err.message);
     return false;
   }
 
