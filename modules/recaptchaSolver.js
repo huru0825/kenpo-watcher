@@ -71,12 +71,11 @@ async function solveRecaptcha(page) {
   fs.mkdirSync(tmp, { recursive: true });
   await page.screenshot({ path: path.join(tmp, `challenge-debug-${Date.now()}.png`), fullPage: true });
 
-  // ✅ 画像チャレンジUI待機を削除し、代わりに音声チャレンジへ切替
   const isAlreadyAudio = await challengeFrame.$('.rc-audiochallenge');
   if (!isAlreadyAudio) {
     const audioTab = await waitForSelectorWithRetry(challengeFrame, 'div.button-holder.audio-button-holder > button', { maxRetries: 20 });
     if (!audioTab) {
-      await challengeFrame.screenshot({ path: path.join(tmp, `no-audio-button-${Date.now()}.png`) });
+      await page.screenshot({ path: path.join(tmp, `no-audio-button-${Date.now()}.png`), fullPage: true });
       console.warn('[recaptchaSolver] 音声切替ボタン未検出');
       return false;
     }
@@ -96,7 +95,7 @@ async function solveRecaptcha(page) {
   try {
     await challengeFrame.waitForSelector('.rc-audiochallenge', { visible: true, timeout: 30000 });
   } catch {
-    await challengeFrame.screenshot({ path: path.join(tmp, `audio-ui-not-shown-${Date.now()}.png`) });
+    await page.screenshot({ path: path.join(tmp, `audio-ui-not-shown-${Date.now()}.png`), fullPage: true });
     console.warn('[recaptchaSolver] 音声UI出現せずタイムアウト');
     return false;
   }
