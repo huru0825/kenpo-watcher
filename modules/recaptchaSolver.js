@@ -33,8 +33,14 @@ async function solveRecaptcha(page) {
       }, { timeout: 10000 });
       checkboxFrame = await anchorHandle.contentFrame();
       const box = await checkboxFrame.$('.recaptcha-checkbox-border');
-      await page.waitForTimeout(randomDelay(300, 700));
-      await box.click();
+      const boxBox = await box.boundingBox();
+      await page.mouse.move(boxBox.x + boxBox.width * Math.random(), boxBox.y + boxBox.height * Math.random(), { steps: 25 });
+      await page.waitForTimeout(500 + Math.random() * 500);
+      await page.mouse.click(
+        boxBox.x + boxBox.width * Math.random(),
+        boxBox.y + boxBox.height * Math.random(),
+        { delay: 150 + Math.random() * 100 }
+      );
       console.log('[reCAPTCHA] ✅ チェックボックスクリック');
       break;
     } catch (err) {
@@ -65,13 +71,36 @@ async function solveRecaptcha(page) {
   fs.mkdirSync(tmp, { recursive: true });
   await page.screenshot({ path: path.join(tmp, `challenge-debug-${Date.now()}.png`), fullPage: true });
 
-  await challengeFrame.waitForSelector('.rc-imageselect-payload', { timeout: 15000 });
-  const audioTab = await waitForSelectorWithRetry(challengeFrame, 'div.button-holder.audio-button-holder > button', { maxRetries: 10 });
+  // ✅ 画像チャレンジUI待機を削除し、代わりに音声チャレンジへ切替
+  const isAlreadyAudio = await challengeFrame.$('.rc-audiochallenge');
+  if (!isAlreadyAudio) {
+    const audioTab = await waitForSelectorWithRetry(challengeFrame, 'div.button-holder.audio-button-holder > button', { maxRetries: 20 });
+    if (!audioTab) {
+      await challengeFrame.screenshot({ path: path.join(tmp, `no-audio-button-${Date.now()}.png`) });
+      console.warn('[recaptchaSolver] 音声切替ボタン未検出');
+      return false;
+    }
+    const tabBox = await audioTab.boundingBox();
+    await page.mouse.move(tabBox.x + tabBox.width * Math.random(), tabBox.y + tabBox.height * Math.random(), { steps: 25 });
+    await page.waitForTimeout(600 + Math.random() * 600);
+    await page.mouse.click(
+      tabBox.x + tabBox.width * Math.random(),
+      tabBox.y + tabBox.height * Math.random(),
+      { delay: 150 + Math.random() * 100 }
+    );
+    console.log('[recaptchaSolver] ✅ 音声チャレンジへ切替成功');
+  } else {
+    console.log('[recaptchaSolver] 🎧 既に音声チャレンジ');
+  }
 
-  await audioTab.click();
-  console.log('[reCAPTCHA] ✅ 音声チャレンジ切替');
+  try {
+    await challengeFrame.waitForSelector('.rc-audiochallenge', { visible: true, timeout: 30000 });
+  } catch {
+    await challengeFrame.screenshot({ path: path.join(tmp, `audio-ui-not-shown-${Date.now()}.png`) });
+    console.warn('[recaptchaSolver] 音声UI出現せずタイムアウト');
+    return false;
+  }
 
-  await challengeFrame.waitForSelector('.rc-audiochallenge', { visible: true, timeout: 20000 });
   await challengeFrame.waitForFunction(() => {
     const btn = document.getElementById('recaptcha-audio-button');
     return btn && !btn.disabled;
