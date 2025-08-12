@@ -48,6 +48,7 @@ async function solveRecaptcha(page) {
       await page.waitForTimeout(1000);
     }
   }
+
   if (!checkboxFrame) {
     console.error('[reCAPTCHA] ❌ チェックボックスクリック失敗');
     return false;
@@ -92,18 +93,18 @@ async function solveRecaptcha(page) {
     console.log('[recaptchaSolver] 🎧 既に音声チャレンジ');
   }
 
+  // ✅ ここを waitForFunction に変更
   try {
-    await challengeFrame.waitForSelector('.rc-audiochallenge', { visible: true, timeout: 30000 });
+    await challengeFrame.waitForFunction(() => {
+      const audio = document.querySelector('.rc-audiochallenge');
+      const btn = document.getElementById('recaptcha-audio-button');
+      return audio && btn && !btn.disabled;
+    }, { timeout: 30000 });
   } catch {
     await page.screenshot({ path: path.join(tmp, `audio-ui-not-shown-${Date.now()}.png`), fullPage: true });
     console.warn('[recaptchaSolver] 音声UI出現せずタイムアウト');
     return false;
   }
-
-  await challengeFrame.waitForFunction(() => {
-    const btn = document.getElementById('recaptcha-audio-button');
-    return btn && !btn.disabled;
-  }, { timeout: 20000 });
 
   const audioFilePath = await downloadAudioFromPage(challengeFrame);
   const transcript = await transcribeAudio(audioFilePath);
