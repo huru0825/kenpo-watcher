@@ -95,24 +95,42 @@ async function solveRecaptcha(page) {
     console.log('[recaptchaSolver] 🎧 既に音声チャレンジ');
   }
 
+  // 🔄 条件を分割して段階的に処理を進める
   try {
+    // 1. .rc-audiochallenge の表示確認
+    await challengeFrame.waitForSelector('.rc-audiochallenge', { visible: true, timeout: 30000 });
+
+    // 2. audio 要素の src 属性が読み込まれるのを待機（Whisper 解析用）
     await challengeFrame.waitForFunction(() => {
-      const audio = document.querySelector('.rc-audiochallenge');
-      const btn = document.getElementById('recaptcha-audio-button');
-      return audio && btn && !btn.disabled;
-    }, { timeout: 30000 });
+      const audio = document.querySelector('audio');
+      return audio && audio.src && audio.src.startsWith('https://');
+    }, { timeout: 10000 });
+
   } catch (err) {
     await page.screenshot({ path: path.join(tmp, `audio-ui-not-shown-${Date.now()}.png`), fullPage: true });
-    console.warn('[recaptchaSolver] 音声UI出現せずタイムアウト:', err.message);
+    console.warn('[recaptchaSolver] 音声UIまたは音声ファイル未検出:', err.message);
     return false;
   }
 
-  const audioFilePath = await downloadAudioFromPage(challengeFrame);
-  const transcript = await transcribeAudio(audioFilePath);
-  console.log('📝 Whisper 認識結果:', transcript);
+  // 🔊 音声取得 & Whisper 解析（非同期開始）
+  const audioPromise = (async () => {
+    const audioFilePath = await downloadAudioFromPage(challengeFrame);
+    const transcript = await transcribeAudio(audioFilePath);
+    console.log('📝 Whisper 認識結果:', transcript);
+    return { audioFilePath, transcript };
+  })();
 
-  await (await challengeFrame.$('#audio-response')).type(transcript.trim(), { delay: 100 });
-  await (await challengeFrame.$('button#recaptcha-verify-button')).click();
+  // ⌨️ 入力欄と送信ボタンの同時待機（非同期）
+  const inputPromise = waitForSelectorWithRetry(challengeFrame, '#audio-response', { maxRetries: 20 });
+  const sendBtnPromise = waitForSelectorWithRetry(challengeFrame, 'button#recaptcha-verify-button', { maxRetries: 20 });
+
+  const { audioFilePath, transcript } = await audioPromise;
+  const inputEl = await inputPromise;
+  await inputEl.type(transcript.trim(), { delay: 100 });
+
+  const sendBtn = await sendBtnPromise;
+  await page.waitForTimeout(randomDelay(300, 600));
+  await sendBtn.click();
   console.log('[reCAPTCHA] ✅ 音声回答送信完了');
 
   await page.waitForTimeout(2000);
