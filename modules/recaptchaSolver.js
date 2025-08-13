@@ -1,9 +1,9 @@
 // modules/recaptchaSolver.js
 
 const path = require('path');
-const fs   = require('fs');
+const fs = require('fs');
 const { downloadAudioFromPage } = require('./audioDownloader');
-const { transcribeAudio }       = require('./whisper');
+const { transcribeAudio } = require('./whisper');
 
 function waitForSelectorWithRetry(frame, selector, { interval = 1000, maxRetries = 60 } = {}) {
   return (async () => {
@@ -18,6 +18,17 @@ function waitForSelectorWithRetry(frame, selector, { interval = 1000, maxRetries
 
 function randomDelay(min = 200, max = 800) {
   return Math.floor(Math.random() * (max - min)) + min;
+}
+
+async function refreshChallengeFrame(page) {
+  try {
+    const bframeHandle = await waitForSelectorWithRetry(page, 'iframe[src*="/recaptcha/api2/bframe"]');
+    return await bframeHandle.contentFrame();
+  } catch {
+    const titleHandle = await page.$('iframe[title*="recaptcha challenge"]');
+    if (titleHandle) return await titleHandle.contentFrame();
+  }
+  return null;
 }
 
 async function saveMp3FromUrl(page, audioUrl) {
@@ -56,11 +67,11 @@ async function solveRecaptcha(page) {
 
       checkboxFrame = await anchorHandle.contentFrame();
       const box = await checkboxFrame.$('.recaptcha-checkbox-border');
-      const bb  = await box.boundingBox();
+      const bb = await box.boundingBox();
       await page.mouse.move(bb.x + bb.width * Math.random(), bb.y + bb.height * Math.random(), { steps: 25 });
       await page.waitForTimeout(500 + Math.random() * 500);
       await page.mouse.click(
-        bb.x + bb.width  * Math.random(),
+        bb.x + bb.width * Math.random(),
         bb.y + bb.height * Math.random(),
         { delay: 120 + Math.random() * 120 }
       );
@@ -77,15 +88,7 @@ async function solveRecaptcha(page) {
     return false;
   }
 
-  let challengeFrame = null;
-  try {
-    const bframeHandle = await waitForSelectorWithRetry(page, 'iframe[src*="/recaptcha/api2/bframe"]');
-    challengeFrame = await bframeHandle.contentFrame();
-  } catch {
-    const titleHandle = await page.$('iframe[title*="recaptcha challenge"]');
-    if (titleHandle) challengeFrame = await titleHandle.contentFrame();
-  }
-
+  let challengeFrame = await refreshChallengeFrame(page);
   if (!challengeFrame) {
     console.error('[reCAPTCHA] ❌ challenge iframe取得失敗');
     return false;
@@ -104,7 +107,7 @@ async function solveRecaptcha(page) {
     await page.mouse.move(bb.x + bb.width * Math.random(), bb.y + bb.height * Math.random(), { steps: 25 });
     await page.waitForTimeout(600 + Math.random() * 600);
     await page.mouse.click(
-      bb.x + bb.width  * Math.random(),
+      bb.x + bb.width * Math.random(),
       bb.y + bb.height * Math.random(),
       { delay: 120 + Math.random() * 120 }
     );
@@ -128,10 +131,25 @@ async function solveRecaptcha(page) {
 
   const audioPromise = (async () => {
     try {
-      const audioSrc = await challengeFrame.evaluate(() => {
-        const a = document.querySelector('audio');
-        return a ? a.src : null;
-      });
+      let audioSrc;
+      try {
+        audioSrc = await challengeFrame.evaluate(() => {
+          const a = document.querySelector('audio');
+          return a ? a.src : null;
+        });
+      } catch (e) {
+        if (e.message.includes('detached')) {
+          console.warn('[recaptchaSolver] ⚠️ frame detached, retrying...');
+          challengeFrame = await refreshChallengeFrame(page);
+          audioSrc = await challengeFrame.evaluate(() => {
+            const a = document.querySelector('audio');
+            return a ? a.src : null;
+          });
+        } else {
+          throw e;
+        }
+      }
+
       if (audioSrc) {
         const p = await saveMp3FromUrl(challengeFrame, audioSrc);
         console.log('[recaptchaSolver] 🎯 audio 直リンクDL成功');
@@ -147,11 +165,11 @@ async function solveRecaptcha(page) {
     return p;
   })();
 
-  const inputPromise   = waitForSelectorWithRetry(challengeFrame, '#audio-response', { maxRetries: 30 });
+  const inputPromise = waitForSelectorWithRetry(challengeFrame, '#audio-response', { maxRetries: 30 });
   const sendBtnPromise = waitForSelectorWithRetry(challengeFrame, 'button#recaptcha-verify-button', { maxRetries: 30 });
 
   const audioFilePath = await audioPromise;
-  const transcript    = await transcribeAudio(audioFilePath);
+  const transcript = await transcribeAudio(audioFilePath);
   console.log('📝 Whisper 認識結果:', transcript);
 
   const inputEl = await inputPromise;
