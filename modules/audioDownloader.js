@@ -19,12 +19,16 @@ function copyToDocuments(srcPath) {
 async function downloadAudioFromPage(frame) {
   console.log('[reCAPTCHA] 🎧 音声チャレンジの音源をキャッチ中...');
 
-  const page = frame.page ? frame.page() : frame._page;
+  // 親ページ取得を安全に
+  const page = frame._frameManager?.page() || frame._page;
+  if (!page || typeof page.waitForResponse !== 'function') {
+    throw new Error('[audioDownloader] ❌ pageオブジェクト取得に失敗');
+  }
+
   const tmpDir = process.env.LOCAL_SCREENSHOT_DIR || '/tmp/screenshots';
   fs.mkdirSync(tmpDir, { recursive: true });
 
   try {
-    // waitForResponse をセットしてから、再取得をトリガー
     const audioResponsePromise = page.waitForResponse(
       res =>
         res.url().includes('/recaptcha/api2/payload') &&
@@ -32,7 +36,6 @@ async function downloadAudioFromPage(frame) {
       { timeout: 15000 }
     );
 
-    // ダウンロードボタンをクリックしてリクエストをトリガー
     await frame.evaluate(() => {
       const btn = document.querySelector('.rc-audiochallenge-tdownload-link');
       if (btn) btn.click();
