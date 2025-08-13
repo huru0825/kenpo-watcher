@@ -159,8 +159,8 @@ async function solveRecaptcha(page) {
     } catch (e) {
       console.warn('[recaptchaSolver] 直リンク失敗 → フォールバック採用:', e.message);
     }
-
-    const p = await downloadAudioFromPage(challengeFrame);
+    
+    const p = await downloadAudioFromPage(page);
     console.log('[recaptchaSolver] 🔁 ネットワークフックDL成功');
     return p;
   })();
