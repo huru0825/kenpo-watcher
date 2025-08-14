@@ -1,14 +1,19 @@
-//modules/notirier.js
+// modules/notifier.js
 
 const axios = require('axios');
 const { GAS_WEBHOOK_URL, TARGET_FACILITY_NAME, INDEX_URL } = require('./constants');
+const { reportError } = require('./kw-error');
 
 async function sendNotification(label) {
   if (!GAS_WEBHOOK_URL) return;
   const payload = {
     message: `【${TARGET_FACILITY_NAME}】予約状況更新\n日付：${label}\n詳細▶︎${INDEX_URL}`
   };
-  await axios.post(GAS_WEBHOOK_URL, payload);
+  try {
+    await axios.post(GAS_WEBHOOK_URL, payload);
+  } catch (err) {
+    reportError('E033', err, { replace: { label } });
+  }
 }
 
 async function sendNoVacancyNotice() {
@@ -16,7 +21,11 @@ async function sendNoVacancyNotice() {
   const payload = {
     message: `ℹ️ ${TARGET_FACILITY_NAME} の空きはありませんでした。\n監視URL▶︎${INDEX_URL}`
   };
-  await axios.post(GAS_WEBHOOK_URL, payload);
+  try {
+    await axios.post(GAS_WEBHOOK_URL, payload);
+  } catch (err) {
+    reportError('E034', err);
+  }
 }
 
 async function sendErrorNotification(err) {
@@ -24,7 +33,11 @@ async function sendErrorNotification(err) {
   const payload = {
     message: '⚠️ エラーが発生しました：\n' + (err.stack || err.message)
   };
-  await axios.post(GAS_WEBHOOK_URL, payload);
+  try {
+    await axios.post(GAS_WEBHOOK_URL, payload);
+  } catch (e) {
+    reportError('E035', e, { replace: { message: err.message } });
+  }
 }
 
 module.exports = { sendNotification, sendNoVacancyNotice, sendErrorNotification };
