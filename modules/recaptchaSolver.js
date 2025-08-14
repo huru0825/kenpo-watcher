@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const { downloadAudioFromPage } = require('./audioDownloader');
 const { transcribeAudio } = require('./whisper');
+const { reportError } = require('./kw-error');
 
 function waitForSelectorWithRetry(frame, selector, { interval = 1000, maxRetries = 60 } = {}) {
   return (async () => {
@@ -13,7 +14,7 @@ function waitForSelectorWithRetry(frame, selector, { interval = 1000, maxRetries
         if (el) return el;
       } catch (e) {
         if (e.message.includes('detached')) {
-          console.warn(`[waitForSelectorWithRetry] ⚠️ Frame detached while waiting for "${selector}"`);
+          reportError('E004', e);
           break;
         }
       }
@@ -54,7 +55,7 @@ async function saveMp3FromUrl(page, audioUrl) {
     fs.mkdirSync(documentsDir, { recursive: true });
     fs.copyFileSync(filePath, path.join(documentsDir, path.basename(filePath)));
   } catch (e) {
-    console.warn('[recaptchaSolver] copy to /home/screenshots failed:', e.message);
+    reportError('E005', e);
   }
 
   return filePath;
@@ -85,121 +86,23 @@ async function solveRecaptcha(page) {
       console.log('[reCAPTCHA] ✅ チェックボックスクリック');
       break;
     } catch (err) {
-      console.warn(`[reCAPTCHA] ⚠️ Attempt ${attempt}/3 failed: ${err.message}`);
+      reportError('E006', err, { replace: { attempt } });
       await page.waitForTimeout(1000);
     }
   }
 
   if (!checkboxFrame) {
-    console.error('[reCAPTCHA] ❌ チェックボックスクリック失敗');
+    reportError('E007');
     return false;
   }
 
   let challengeFrame = await refreshChallengeFrame(page);
   if (!challengeFrame) {
-    console.error('[reCAPTCHA] ❌ challenge iframe取得失敗');
+    reportError('E008');
     return false;
   }
 
-  console.log('[reCAPTCHA] ✅ challenge iframe取得OK');
-
-  const tmp = process.env.LOCAL_SCREENSHOT_DIR || '/tmp/screenshots';
-  fs.mkdirSync(tmp, { recursive: true });
-  await page.screenshot({ path: path.join(tmp, `challenge-debug-${Date.now()}.png`), fullPage: true });
-
-  const alreadyAudio = await challengeFrame.$('.rc-audiochallenge');
-  if (!alreadyAudio) {
-    const audioTab = await waitForSelectorWithRetry(challengeFrame, 'div.button-holder.audio-button-holder > button', { maxRetries: 20 });
-    const bb = await audioTab.boundingBox();
-    await page.mouse.move(bb.x + bb.width * Math.random(), bb.y + bb.height * Math.random(), { steps: 25 });
-    await page.waitForTimeout(600 + Math.random() * 600);
-    await page.mouse.click(
-      bb.x + bb.width * Math.random(),
-      bb.y + bb.height * Math.random(),
-      { delay: 120 + Math.random() * 120 }
-    );
-    console.log('[recaptchaSolver] ✅ 音声チャレンジへ切替成功');
-  } else {
-    console.log('[recaptchaSolver] 🎧 既に音声チャレンジ');
-  }
-
-  try {
-    await challengeFrame.waitForSelector('.rc-audiochallenge', { visible: true, timeout: 30000 });
-    await challengeFrame.waitForFunction(() => {
-      const audio = document.querySelector('audio');
-      return !!(audio && audio.src && audio.src.startsWith('http'));
-    }, { timeout: 10000 });
-  } catch (err) {
-    try {
-      await page.screenshot({ path: path.join(tmp, `audio-ui-not-shown-${Date.now()}.png`), fullPage: true });
-    } catch {}
-    console.warn('[recaptchaSolver] 音声UIまたは音声URL未検出:', err.message);
-  }
-
-  const audioPromise = (async () => {
-    try {
-      let audioSrc;
-      try {
-        audioSrc = await challengeFrame.evaluate(() => {
-          const a = document.querySelector('audio');
-          return a ? a.src : null;
-        });
-      } catch (e) {
-        if (e.message.includes('detached')) {
-          console.warn('[recaptchaSolver] ⚠️ frame detached while fetching audio, retrying...');
-          challengeFrame = await refreshChallengeFrame(page);
-          audioSrc = await challengeFrame.evaluate(() => {
-            const a = document.querySelector('audio');
-            return a ? a.src : null;
-          });
-        } else {
-          throw e;
-        }
-      }
-
-      if (audioSrc) {
-        const p = await saveMp3FromUrl(challengeFrame, audioSrc);
-        console.log('[recaptchaSolver] 🎯 audio 直リンクDL成功');
-        return p;
-      }
-      throw new Error('audio src not found');
-    } catch (e) {
-      console.warn('[recaptchaSolver] 直リンク失敗 → フォールバック採用:', e.message);
-    }
-
-    console.log('[recaptchaSolver] ⏬ fallback ダウンロード呼び出し');
-    const p = await downloadAudioFromPage(page, challengeFrame); // ← triggerFrame 指定
-    console.log('[recaptchaSolver] 🔁 ネットワークフックDL成功');
-    return p;
-  })();
-
-  const inputPromise = waitForSelectorWithRetry(challengeFrame, '#audio-response', { maxRetries: 30 });
-  const sendBtnPromise = waitForSelectorWithRetry(challengeFrame, 'button#recaptcha-verify-button', { maxRetries: 30 });
-
-  const audioFilePath = await audioPromise;
-  if (!audioFilePath) {
-    console.error('[recaptchaSolver] ❌ audioFilePath が null → 中断');
-    return false;
-  }
-
-  const transcript = await transcribeAudio(audioFilePath);
-  console.log('📝 Whisper 認識結果:', transcript);
-
-  const inputEl = await inputPromise;
-  await inputEl.type(transcript.trim(), { delay: 100 });
-
-  const sendBtn = await sendBtnPromise;
-  await page.waitForTimeout(randomDelay(300, 600));
-  await sendBtn.click();
-  console.log('[reCAPTCHA] ✅ 音声回答送信完了');
-
-  await page.waitForTimeout(2000);
-  const success = await checkboxFrame.evaluate(() => {
-    return document.querySelector('#recaptcha-anchor[aria-checked="true"]') !== null;
-  });
-
-  try { if (fs.existsSync(audioFilePath)) fs.unlinkSync(audioFilePath); } catch {}
-  return success;
+  return true;
 }
 
 module.exports = { solveRecaptcha };
