@@ -1,5 +1,8 @@
+// modules/spreadsheet.js
+
 const axios = require('axios');
 const { GAS_WEBHOOK_URL } = require('./constants');
+const { reportError } = require('./kw-error');
 
 /**
  * GAS上のエンドポイントからスプレッドシートのCookie配列を取得
@@ -7,16 +10,16 @@ const { GAS_WEBHOOK_URL } = require('./constants');
  */
 async function readCookiesFromSpreadsheet() {
   if (!GAS_WEBHOOK_URL) {
-    console.warn('⚠️ GAS_WEBHOOK_URL が未設定のため、固定Cookieを使用します');
+    reportError('E037');
     return [];
   }
 
   try {
-    const res = await axios.get(GAS_WEBHOOK_URL); // GETでCookie JSON取得
+    const res = await axios.get(GAS_WEBHOOK_URL);
     if (!Array.isArray(res.data)) throw new Error('スプレッドシート応答が配列ではありません');
     return res.data;
   } catch (err) {
-    console.error('❌ スプレッドシートからのCookie取得失敗:', err.message);
+    reportError('E038', err, { replace: { message: err.message } });
     return [];
   }
 }
@@ -27,15 +30,15 @@ async function readCookiesFromSpreadsheet() {
  */
 async function saveCookiesToSpreadsheet(cookies) {
   if (!GAS_WEBHOOK_URL) {
-    console.warn('⚠️ GAS_WEBHOOK_URL が未設定のため、スプレッドシート保存をスキップします');
+    reportError('E040');
     return;
   }
 
   try {
-    await axios.post(GAS_WEBHOOK_URL, cookies); // POSTで保存
+    await axios.post(GAS_WEBHOOK_URL, cookies);
     console.log('✅ Cookie情報をスプレッドシートに送信しました');
   } catch (err) {
-    console.error('❌ Cookie送信失敗:', err.message);
+    reportError('E041', err, { replace: { message: err.message } });
   }
 }
 
