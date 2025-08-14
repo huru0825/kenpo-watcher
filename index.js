@@ -2,20 +2,6 @@
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, 'kenpo-watcher.env') });
 const fs = require('fs');
-
-function copyToDocuments(srcPath) {
-  const documentsDir = '/mnt/Documents/screenshots';
-  try {
-    fs.mkdirSync(documentsDir, { recursive: true });
-    const fileName = path.basename(srcPath);
-    const destPath = path.join(documentsDir, fileName);
-    fs.copyFileSync(srcPath, destPath);
-    console.log(`[copy] 📁 ${srcPath} → ${destPath}`);
-  } catch (err) {
-    console.warn('[copy] ❌ 転送失敗:', err.message);
-  }
-}
-
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const { launchBrowser } = require('./modules/launch');
@@ -23,7 +9,8 @@ const { waitCalendar, nextMonth, prevMonth } = require('./modules/navigate');
 const { visitMonth } = require('./modules/visitMonth');
 const { sendNotification, sendNoVacancyNotice, sendErrorNotification } = require('./modules/notifier');
 const { updateCookiesIfValid, saveCookies } = require('./modules/cookieUpdater');
-const { solveRecaptcha } = require('./modules/recaptchaSolver'); // ← 差し替え済み
+const { solveRecaptcha } = require('./modules/recaptchaSolver');
+const { reportError } = require('./modules/kw-error');
 const { INDEX_URL } = require('./modules/constants');
 
 puppeteer.use(StealthPlugin());
@@ -48,7 +35,6 @@ async function run() {
     await pageA.setUserAgent(sharedContext.userAgent);
     await pageA.setExtraHTTPHeaders(sharedContext.headers);
 
-    // Cookie 注入処理
     if (sharedContext.cookies?.length) {
       console.log('[run] スプレッドシートから Cookie 注入');
       await pageA.setCookie(...sharedContext.cookies);
@@ -81,19 +67,17 @@ async function run() {
     console.log('[run] reCAPTCHA 突破開始');
     const ok = await solveRecaptcha(pageA);
     if (!ok) {
-      console.error('[run] ❌ solveRecaptcha failed');
+      reportError('E002', new Error('reCAPTCHA突破失敗'));
       const tmp = process.env.LOCAL_SCREENSHOT_DIR || '/tmp/screenshots';
       fs.mkdirSync(tmp, { recursive: true });
       const screenshotPath = path.join(tmp, 'recaptcha-fail.png');
       await pageA.screenshot({ path: screenshotPath, fullPage: true });
-      copyToDocuments(screenshotPath);
       throw new Error('reCAPTCHA突破失敗');
     }
     console.log('[run] ✅ reCAPTCHA bypass succeeded');
 
     await waitCalendar(pageA);
 
-    // 通知対象月の探索
     const sequence = [
       { action: null, includeDate: true },
       { action: nextMonth, includeDate: false },
@@ -118,7 +102,6 @@ async function run() {
 
     if (!notified.size) await sendNoVacancyNotice();
 
-    // Cookie 保存
     if (!sharedContext.cookies?.length) {
       const current = await pageA.cookies();
       await saveCookies(current);
@@ -129,7 +112,6 @@ async function run() {
     await browserA.close();
     browserA = null;
 
-    // Cookie 更新チェック用ブラウザ
     browserB = await launchBrowser();
     const pageB = await browserB.newPage();
     await pageB.setViewport({ width: 1280, height: 800 });
@@ -141,7 +123,7 @@ async function run() {
     console.log('[run] 全処理完了');
 
   } catch (err) {
-    console.error('⚠️ 例外発生:', err);
+    reportError('E003', err);
     await sendErrorNotification(err);
   } finally {
     if (browserA) await browserA.close();
