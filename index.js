@@ -67,12 +67,17 @@ async function run() {
     console.log('[run] reCAPTCHA 突破開始');
     const ok = await solveRecaptcha(pageA);
     if (!ok) {
-      reportError('E002', new Error('reCAPTCHA突破失敗'));
+      const err = new Error('reCAPTCHA突破失敗');
+      reportError('E002', err);
       const tmp = process.env.LOCAL_SCREENSHOT_DIR || '/tmp/screenshots';
       fs.mkdirSync(tmp, { recursive: true });
       const screenshotPath = path.join(tmp, 'recaptcha-fail.png');
-      await pageA.screenshot({ path: screenshotPath, fullPage: true });
-      throw new Error('reCAPTCHA突破失敗');
+      try {
+        await pageA.screenshot({ path: screenshotPath, fullPage: true });
+      } catch (err) {
+        reportError('E001', err);
+      }
+      throw err;
     }
     console.log('[run] ✅ reCAPTCHA bypass succeeded');
 
