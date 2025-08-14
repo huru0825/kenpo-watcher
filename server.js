@@ -6,48 +6,32 @@ require('dotenv').config({
   debug: true
 });
 
-// プロセスを落とさずログだけ出すように変更
-process.on('unhandledRejection', (reason) => {
-  console.error('⚠️ UnhandledRejection captured:', reason);
-});
-
-process.on('uncaughtException', (error) => {
-  console.error('⚠️ UncaughtException captured:', error);
-});
-
 const express = require('express');
 const fs = require('fs');
-
 const { run, warmup, setSharedContext } = require('./index');
 const {
   CHROME_PATH,
   GAS_WEBHOOK_URL,
   INDEX_URL,
   BASE_URL
-} = require('./modules/constants');
-const { selectCookies } = require('./modules/cookieSelector');
+} = require('./constants');
+const { selectCookies } = require('./cookieSelector');
+const { reportError } = require('./kw-error');
 
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-const stealth = StealthPlugin();
-//stealth.enabledEvasions.delete('iframe.contentWindow'); // reCAPTCHA安定化用
-puppeteer.use(stealth);
+puppeteer.use(StealthPlugin());
 
 const app = express();
 app.use(express.json());
-
-// /tmp を静的ファイルとして提供
 app.use('/tmp', express.static(path.join(__dirname, 'tmp')));
 
-// 生存確認用エンドポイント
 app.get('/', (req, res) => {
   res.send('Kenpo Watcher is alive! 🚀');
 });
 
-// ヘルスチェック
 app.get('/health', (req, res) => res.send('OK'));
 
-// /run エンドポイント定義
 const handleRun = async (req, res) => {
   try {
     const result = await run();
@@ -62,8 +46,7 @@ const handleRun = async (req, res) => {
 
     res.sendStatus(204);
   } catch (err) {
-    console.error('💥 /run error:', err.message);
-    console.error(err.stack);
+    reportError('SVE003', err);
     res.sendStatus(500);
   }
 };
@@ -71,46 +54,56 @@ const handleRun = async (req, res) => {
 app.get('/run', handleRun);
 app.post('/run', handleRun);
 
-// メイン関数
 async function main() {
-  const selectedCookies = await selectCookies();
+  try {
+    const selectedCookies = await selectCookies();
+    setSharedContext({
+      puppeteer,
+      launchOptions: {
+        executablePath: CHROME_PATH,
+        headless: 'new',
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-web-security',
+          '--disable-features=IsolateOrigins,site-per-process',
+          '--disable-blink-features=AutomationControlled',
+          '--window-size=1024,768'
+        ]
+      },
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/115.0.0.0 Safari/537.36',
+      headers: { 'Accept-Language': 'ja-JP,ja;q=0.9' },
+      cookies: selectedCookies,
+      url: INDEX_URL,
+      webhookUrl: GAS_WEBHOOK_URL
+    });
 
-  setSharedContext({
-    puppeteer,
-    launchOptions: {
-      executablePath: CHROME_PATH,
-      headless: 'new',
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-web-security',
-        '--disable-features=IsolateOrigins,site-per-process',
-        '--disable-blink-features=AutomationControlled',
-        '--window-size=1024,768'
-      ]
-    },
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/115.0.0.0 Safari/537.36',
-    headers: { 'Accept-Language': 'ja-JP,ja;q=0.9' },
-    cookies: selectedCookies,
-    url: INDEX_URL,
-    webhookUrl: GAS_WEBHOOK_URL
-  });
-
-  const port = process.env.PORT || 10000;
-  app.listen(port, async () => {
-    console.log(`✅ Server listening on port ${port}`);
-    try {
+    const port = process.env.PORT || 10000;
+    app.listen(port, async () => {
+      console.log(`✅ Server listening on port ${port}`);
       console.log('✨ Warmup: launching browser to avoid cold start...');
-      if (typeof warmup === 'function') {
-        await warmup();
-        console.log('✨ Warmup completed');
-      } else {
-        console.warn('⚠️ Warmup is not defined as function → skip');
+      try {
+        if (typeof warmup === 'function') {
+          await warmup();
+          console.log('✨ Warmup completed');
+        } else {
+          reportError('SVE004');
+        }
+      } catch (e) {
+        reportError('SVE005', e);
       }
-    } catch (e) {
-      console.error('⚠️ Warmup failed (ignored):', e);
-    }
-  });
+    });
+  } catch (err) {
+    reportError('SVE001', err);
+  }
 }
+
+process.on('unhandledRejection', (reason) => {
+  reportError('SVE001', new Error(String(reason)));
+});
+
+process.on('uncaughtException', (error) => {
+  reportError('SVE002', error);
+});
 
 main();
