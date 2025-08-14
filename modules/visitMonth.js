@@ -1,5 +1,7 @@
 // modules/visitMonth.js
+
 const { DATE_FILTER_LIST, DAY_FILTER, TARGET_DAY_RAW, TARGET_FACILITY_NAME } = require('./constants');
+const { reportError } = require('./kw-error');
 
 async function visitMonth(page, includeDateFilter) {
   console.log('[visitMonth] 実行開始');
@@ -8,7 +10,7 @@ async function visitMonth(page, includeDateFilter) {
   const challenge = await page.waitForSelector('iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect', { timeout: 1000 }).catch(() => null);
 
   if (challenge && !anchor) {
-    console.warn('[visitMonth] reCAPTCHA画像チャレンジ検出 → スキップ');
+    reportError('E026');
     return [];
   }
 
@@ -20,7 +22,7 @@ async function visitMonth(page, includeDateFilter) {
   );
 
   if (available.length === 0) {
-    console.log('[visitMonth] 該当リンクなし（○アイコンなし）');
+    reportError('E027');
     return [];
   } else {
     console.log(`[visitMonth] ○アイコン検出 ${available.length} 件`);
@@ -37,39 +39,38 @@ async function visitMonth(page, includeDateFilter) {
 
       await page.goto(href, { waitUntil: 'networkidle2', timeout: 0 });
 
-      // 安定化のため waitForFunction → waitForSelector に変更＋補完
       try {
         await page.waitForSelector('.tb-calendar tbody td', { timeout: 10000 });
         await page.waitForTimeout(1000);
       } catch (e) {
-        console.warn(`[visitMonth] カレンダー描画待機失敗: ${label}`);
+        reportError('E028', e, { replace: { label } });
         continue;
       }
 
       const ia = await page.waitForSelector('iframe[src*="/recaptcha/api2/anchor"]', { timeout: 1000 }).catch(() => null);
       const ii = await page.waitForSelector('iframe[src*="/recaptcha/api2/bframe"], .rc-imageselect', { timeout: 1000 }).catch(() => null);
       if (ii && !ia) {
-        console.warn(`[visitMonth] 遷移先でreCAPTCHA出現 → スキップ: ${label}`);
+        reportError('E029', null, { replace: { label } });
         await page.goBack({ waitUntil: 'networkidle2' }).catch(() => {});
         continue;
       }
 
-      await page.waitForTimeout(1000); // DOM描画安定のため
+      await page.waitForTimeout(1000);
 
       const found = await page.evaluate(name =>
         Array.from(document.querySelectorAll('a')).some(a => a.textContent.includes(name)), TARGET_FACILITY_NAME
       );
 
       if (found) {
-        console.log(`[visitMonth] ✅ 一致施設名を確認 → 成功: ${label}`);
+        reportError('E030', null, { replace: { label } });
         hits.push(label);
       } else {
-        console.log(`[visitMonth] ❌ 施設名一致せず: ${label}`);
+        reportError('E031', null, { replace: { label } });
       }
 
       await page.goBack({ waitUntil: 'networkidle2' }).catch(() => {});
     } else {
-      console.log(`[visitMonth] フィルタ不一致 → スキップ: ${label}`);
+      reportError('E032', null, { replace: { label } });
     }
   }
 
