@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { reportError } = require('./kw-error');
 
 function copyToDocuments(srcPath) {
   const documentsDir = '/home/screenshots';
@@ -12,22 +13,24 @@ function copyToDocuments(srcPath) {
     fs.copyFileSync(srcPath, destPath);
     console.log(`[copy] 📁 ${srcPath} → ${destPath}`);
   } catch (err) {
-    console.warn('[copy] ❌ 転送失敗:', err.message);
+    reportError('E005', err);
   }
 }
 
 async function downloadAudioFromPage(page, triggerFrame) {
-  console.log('[reCAPTCHA] 🎧 音声チャレンジの音源をキャッチ中...');
+  reportError('E018');
 
   if (!page || typeof page.waitForResponse !== 'function') {
-    throw new Error('[audioDownloader] ❌ Invalid Page object');
+    reportError('E019', new Error('Invalid Page object'), {
+      replace: { message: 'Invalid Page object' }
+    });
+    return null;
   }
 
   const tmpDir = process.env.LOCAL_SCREENSHOT_DIR || '/tmp/screenshots';
   fs.mkdirSync(tmpDir, { recursive: true });
 
   try {
-    // 先にクリックトリガー
     await triggerFrame.evaluate(() => {
       const btn = document.querySelector('.rc-audiochallenge-tdownload-link');
       if (btn) btn.click();
@@ -44,11 +47,11 @@ async function downloadAudioFromPage(page, triggerFrame) {
     const filePath = path.join(tmpDir, `audio_${Date.now()}.mp3`);
     fs.writeFileSync(filePath, buffer);
     copyToDocuments(filePath);
-    console.log(`[reCAPTCHA] ✅ 音声ファイル保存: ${filePath}`);
+    reportError('E020', null, { replace: { filePath } });
     return filePath;
   } catch (err) {
-    console.warn('[reCAPTCHA] ❌ 音声取得失敗:', err.message);
-    return null; // クラッシュ回避で null返し
+    reportError('E019', err, { replace: { message: err.message } });
+    return null;
   }
 }
 
