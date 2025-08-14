@@ -1,17 +1,18 @@
 // server.js
+
 const path = require('path');
 require('dotenv').config({
   path: path.resolve(__dirname, 'kenpo-watcher.env'),
   debug: true
 });
 
+// プロセスを落とさずログだけ出すように変更
 process.on('unhandledRejection', (reason) => {
-  console.error('UnhandledRejection captured:', reason);
-  process.exit(1);
+  console.error('⚠️ UnhandledRejection captured:', reason);
 });
+
 process.on('uncaughtException', (error) => {
-  console.error('UncaughtException captured:', error);
-  process.exit(1);
+  console.error('⚠️ UncaughtException captured:', error);
 });
 
 const express = require('express');
@@ -26,11 +27,9 @@ const {
 } = require('./modules/constants');
 const { selectCookies } = require('./modules/cookieSelector');
 
-// puppeteer-extra + stealth plugin 導入
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const stealth = StealthPlugin();
-// デバッグ用に削除
 //stealth.enabledEvasions.delete('iframe.contentWindow'); // reCAPTCHA安定化用
 puppeteer.use(stealth);
 
