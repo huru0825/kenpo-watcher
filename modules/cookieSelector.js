@@ -2,14 +2,11 @@
 
 const axios = require('axios');
 const { GAS_WEBHOOK_URL } = require('./constants');
+const { reportError } = require('./kw-error');
 
-/**
- * スプレッドシートから Cookie を取得し、空なら空配列を返す
- * @returns {Promise<import('puppeteer').Cookie[]>}
- */
 async function selectCookies() {
   if (!GAS_WEBHOOK_URL) {
-    console.warn('ℹ️ GAS_WEBHOOK_URL 未設定 → Cookie 取得をスキップ');
+    reportError('E037');
     return [];
   }
 
@@ -23,7 +20,7 @@ async function selectCookies() {
       return [];
     }
   } catch (err) {
-    console.warn('⚠️ スプレッドシートから Cookie 取得失敗:', err.message);
+    reportError('E038', err, { replace: { message: err.message } });
     return [];
   }
 }
