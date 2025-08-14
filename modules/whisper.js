@@ -1,18 +1,15 @@
 // modules/whisper.js
+
 const fs = require('fs');
 const axios = require('axios');
 const FormData = require('form-data');
+const { reportError } = require('./kw-error');
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
-/**
- * Whisper API を呼び出して音声ファイルを文字起こし
- * @param {string} filePath ローカルに保存された音声ファイルのパス
- * @returns {Promise<string>} 文字起こし結果のテキスト
- */
 async function transcribeAudio(filePath) {
   if (!filePath || !fs.existsSync(filePath)) {
-    console.error('[whisper] ❌ 無効なファイルパスが渡されました:', filePath);
+    reportError('E021', null, { replace: { filePath } });
     return '[音声取得失敗]';
   }
 
@@ -33,7 +30,7 @@ async function transcribeAudio(filePath) {
     );
     return response.data.text;
   } catch (err) {
-    console.error('[whisper] ❌ API 呼び出し失敗:', err.message);
+    reportError('E022', err, { replace: { message: err.message } });
     return '[API失敗]';
   }
 }
