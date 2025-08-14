@@ -8,8 +8,15 @@ const { transcribeAudio } = require('./whisper');
 function waitForSelectorWithRetry(frame, selector, { interval = 1000, maxRetries = 60 } = {}) {
   return (async () => {
     for (let i = 0; i < maxRetries; i++) {
-      const el = await frame.$(selector);
-      if (el) return el;
+      try {
+        const el = await frame.$(selector);
+        if (el) return el;
+      } catch (e) {
+        if (e.message.includes('detached')) {
+          console.warn(`[waitForSelectorWithRetry] ⚠️ Frame detached while waiting for "${selector}"`);
+          break;
+        }
+      }
       await frame.waitForTimeout(interval);
     }
     throw new Error(`Selector "${selector}" が ${interval * maxRetries}ms 内に見つかりませんでした`);
@@ -139,7 +146,7 @@ async function solveRecaptcha(page) {
         });
       } catch (e) {
         if (e.message.includes('detached')) {
-          console.warn('[recaptchaSolver] ⚠️ frame detached, retrying...');
+          console.warn('[recaptchaSolver] ⚠️ frame detached while fetching audio, retrying...');
           challengeFrame = await refreshChallengeFrame(page);
           audioSrc = await challengeFrame.evaluate(() => {
             const a = document.querySelector('audio');
@@ -161,7 +168,7 @@ async function solveRecaptcha(page) {
     }
 
     console.log('[recaptchaSolver] ⏬ fallback ダウンロード呼び出し');
-    const p = await downloadAudioFromPage(page);
+    const p = await downloadAudioFromPage(page, challengeFrame); // ← triggerFrame 指定
     console.log('[recaptchaSolver] 🔁 ネットワークフックDL成功');
     return p;
   })();
@@ -170,6 +177,11 @@ async function solveRecaptcha(page) {
   const sendBtnPromise = waitForSelectorWithRetry(challengeFrame, 'button#recaptcha-verify-button', { maxRetries: 30 });
 
   const audioFilePath = await audioPromise;
+  if (!audioFilePath) {
+    console.error('[recaptchaSolver] ❌ audioFilePath が null → 中断');
+    return false;
+  }
+
   const transcript = await transcribeAudio(audioFilePath);
   console.log('📝 Whisper 認識結果:', transcript);
 
