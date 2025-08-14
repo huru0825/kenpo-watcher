@@ -42,7 +42,6 @@ const errorMap = {
   E039: '[cookieUpdater] ファイル保存に失敗: {{message}}',
   E040: '[cookieUpdater|spreadsheet] ℹ️ GAS_WEBHOOK_URL 未設定 → Cookie 書き込みをスキップ',
   E041: '[cookieUpdater|spreadsheet] ❌ スプレッドシートへの Cookie 送信失敗: {{message}}',
-
   SVE001: '[server] ❌ UnhandledPromiseRejection（未処理のPromise拒否）',
   SVE002: '[server] ❌ UncaughtException（未処理の例外）',
   SVE003: '[server] ❌ /run API エンドポイントでの実行時エラー',
